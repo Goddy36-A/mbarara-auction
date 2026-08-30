@@ -1,12 +1,3 @@
-"""
-Creates a superuser from environment variables if one doesn't exist yet.
-Safe to run on every deploy — skips silently if the user already exists.
-
-Required env vars:
-  DJANGO_SUPERUSER_EMAIL
-  DJANGO_SUPERUSER_PASSWORD
-  DJANGO_SUPERUSER_USERNAME  (optional, defaults to 'admin')
-"""
 import os
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
@@ -18,9 +9,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         User = get_user_model()
 
-        email    = os.environ.get("DJANGO_SUPERUSER_EMAIL")
-        password = os.environ.get("DJANGO_SUPERUSER_PASSWORD")
-        username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin")
+        email    = os.environ.get("DJANGO_SUPERUSER_EMAIL", "").strip()
+        password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "").strip()
+        username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin").strip()
 
         if not email or not password:
             self.stdout.write(self.style.WARNING(
@@ -28,17 +19,22 @@ class Command(BaseCommand):
             ))
             return
 
-        if User.objects.filter(email=email).exists():
-            self.stdout.write(self.style.SUCCESS(
-                f"Superuser '{email}' already exists — skipping."
-            ))
-            return
-
-        User.objects.create_superuser(
+        user, created = User.objects.get_or_create(
             username=username,
-            email=email,
-            password=password,
+            defaults={"email": email, "role": User.Role.ADMIN},
         )
+
+        # Always force these flags — fixes cases where user existed
+        # but was created without staff/superuser rights
+        user.email       = email
+        user.is_staff    = True
+        user.is_superuser = True
+        user.role        = User.Role.ADMIN
+        user.set_password(password)
+        user.save()
+
+        action = "Created" if created else "Updated"
         self.stdout.write(self.style.SUCCESS(
-            f"Superuser '{email}' created."
+            f"{action} superuser: username='{username}' email='{email}' "
+            f"is_staff=True is_superuser=True role=ADMIN"
         ))
