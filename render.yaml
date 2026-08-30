@@ -1,0 +1,91 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy the full stack: web (Django/Gunicorn) + Celery worker + Postgres + Redis
+
+services:
+
+  # ── Web service ──────────────────────────────────────────────────────────────
+  - type: web
+    name: mbarara-auction
+    runtime: python
+    region: frankfurt          # closest to Uganda; change to oregon if you prefer
+    plan: free
+    buildCommand: "./build.sh"
+    preDeployCommand: "python manage.py migrate --noinput"
+    startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+    healthCheckPath: /
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: mbarara-auction.onrender.com   # update if you add a custom domain
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://mbarara-auction.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mbarara-auction-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: mbarara-auction-redis
+          property: connectionString
+      # Email — fill these in via Render dashboard (Settings → Environment)
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        sync: false        # set manually in Render dashboard
+      - key: EMAIL_HOST_PASSWORD
+        sync: false        # set manually in Render dashboard
+
+  # ── Celery worker ─────────────────────────────────────────────────────────────
+  - type: worker
+    name: mbarara-auction-celery
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "celery -A config worker --loglevel=info --concurrency=2"
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: mbarara-auction
+          envVarKey: SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mbarara-auction-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: mbarara-auction-redis
+          property: connectionString
+
+  # ── Redis (Celery broker + result backend) ────────────────────────────────────
+  - type: redis
+    name: mbarara-auction-redis
+    region: frankfurt
+    plan: free
+    ipAllowList: []            # only Render internal network can reach it
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+databases:
+  - name: mbarara-auction-db
+    region: frankfurt
+    plan: free
+    databaseName: mbarara_auction
+    user: auction_user
