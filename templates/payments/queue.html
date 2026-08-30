@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Payment queue{% endblock %}
+{% block content %}
+<h2>Payment queue</h2>
+<p class="text-muted">Payments confirmed outside the platform (mobile money, bank transfer, cash) — record the outcome here once you've verified it happened.</p>
+
+<table class="table">
+    <thead><tr><th>Auction</th><th>Buyer</th><th>Seller</th><th>Amount</th><th>Since</th><th>Action</th></tr></thead>
+    <tbody>
+    {% for payment in payments %}
+        <tr>
+            <td><a href="{% url 'auctions:detail' payment.auction.pk %}">{{ payment.auction.title }}</a></td>
+            <td>{{ payment.buyer.username }}</td>
+            <td>{{ payment.seller_user.username }}</td>
+            <td>{{ payment.amount }}</td>
+            <td>{{ payment.created_at }}</td>
+            <td>
+                <form method="post" action="{% url 'payments:mark_paid' payment.pk %}" class="mb-2">
+                    {% csrf_token %}
+                    <input type="text" name="method" class="form-control form-control-sm mb-1" placeholder="Method (e.g. Mobile Money)">
+                    <input type="text" name="reference" class="form-control form-control-sm mb-1" placeholder="Reference (optional)">
+                    <button class="btn btn-success btn-sm" type="submit">Mark paid</button>
+                </form>
+                <form method="post" action="{% url 'payments:mark_failed' payment.pk %}">
+                    {% csrf_token %}
+                    <input type="text" name="reason" class="form-control form-control-sm mb-1" placeholder="Reason for failure" required>
+                    <button class="btn btn-outline-danger btn-sm" type="submit">Mark failed</button>
+                </form>
+            </td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="6" class="text-muted">No payments pending.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

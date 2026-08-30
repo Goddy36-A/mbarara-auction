@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Browse auctions{% endblock %}
+{% block content %}
+<h2>Browse auctions</h2>
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-5">
+        <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search title or description">
+    </div>
+    <div class="col-md-4">
+        <select name="category" class="form-select">
+            <option value="">All categories</option>
+            {% for cat in categories %}
+                <option value="{{ cat.slug }}" {% if cat.slug == selected_category %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3"><button class="btn btn-primary w-100" type="submit">Search</button></div>
+</form>
+
+<div class="row row-cols-1 row-cols-md-3 g-4">
+    {% for auction in auctions %}
+    <div class="col">
+        <div class="card h-100">
+            <div class="card-body">
+                <span class="badge bg-{% if auction.status == 'LIVE' %}success{% else %}secondary{% endif %} mb-2">{{ auction.get_status_display }}</span>
+                <h5 class="card-title">{{ auction.title }}</h5>
+                <p class="card-text text-muted">{{ auction.category.name }} &middot; {{ auction.location }}</p>
+                <p class="card-text">Current: <strong>{{ auction.display_price }}</strong></p>
+                <a href="{% url 'auctions:detail' auction.pk %}" class="btn btn-outline-primary btn-sm">View</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+        <p class="text-muted">No auctions match your search yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}

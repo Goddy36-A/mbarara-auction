@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block title %}{% if auction %}Edit listing{% else %}New listing{% endif %}{% endblock %}
+{% block content %}
+<h2>{% if auction %}Edit listing{% else %}New listing{% endif %}</h2>
+<form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {{ form|crispy }}
+    {% if formset %}
+        <h5 class="mt-4">Images</h5>
+        {{ formset.management_form }}
+        {% for f in formset %}{{ f|crispy }}{% endfor %}
+    {% endif %}
+    <button type="submit" class="btn btn-primary">Save draft</button>
+</form>
+{% endblock %}

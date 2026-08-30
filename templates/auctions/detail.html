@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ auction.title }}{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-7">
+        {% if auction.images.all %}
+            <div id="gallery" class="carousel slide mb-3">
+                <div class="carousel-inner">
+                    {% for img in auction.images.all %}
+                    <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                        <img src="{{ img.image.url }}" class="d-block w-100 rounded" alt="{{ auction.title }}">
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+        <h2>{{ auction.title }} {% if is_owner %}<span class="badge bg-info">Your listing (preview)</span>{% endif %}</h2>
+        <p>{{ auction.description|linebreaks }}</p>
+        <p class="text-muted">Seller: {{ auction.seller.user.username }} &middot; Category: {{ auction.category.name }} &middot; Location: {{ auction.location }}</p>
+
+        <h5 class="mt-4">Bid history</h5>
+        {% if bid_history %}
+        <table class="table table-sm">
+            <thead><tr><th>#</th><th>Bidder</th><th>Amount</th><th>Time</th></tr></thead>
+            <tbody>
+            {% for entry in bid_history reversed %}
+                <tr class="{% if entry.is_mine %}table-info{% endif %} {% if entry.status == 'INVALIDATED' %}text-decoration-line-through text-muted{% endif %}">
+                    <td>{{ entry.sequence_no }}</td>
+                    <td>{{ entry.label }}</td>
+                    <td>{{ entry.amount }}</td>
+                    <td>{{ entry.created_at }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p class="text-muted">No bids yet — be the first.</p>
+        {% endif %}
+    </div>
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-body">
+                <p>Starting price: {{ auction.starting_price }}</p>
+                <p>Current bid: <strong>{{ auction.display_price }}</strong></p>
+                <p>Minimum increment: {{ auction.min_increment }}</p>
+                <p>Status: <span class="badge bg-secondary">{{ auction.get_status_display }}</span></p>
+                <p>Closes: {{ auction.end_time }}</p>
+
+                {% if can_bid %}
+                    <form method="post" action="{% url 'bidding:place_bid' auction.pk %}">
+                        {% csrf_token %}
+                        <div class="mb-2">
+                            <label class="form-label">Your bid (minimum {{ minimum_permitted }})</label>
+                            <input type="number" step="0.01" min="{{ minimum_permitted }}" name="amount" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Place bid</button>
+                    </form>
+                {% elif auction.status == "LIVE" %}
+                    <p class="text-muted small">
+                        {% if not user.is_authenticated %}
+                            <a href="{% url 'accounts:login' %}">Login</a> as a verified bidder to bid.
+                        {% elif not user.is_bidder %}
+                            Only bidder accounts can place bids.
+                        {% elif user.pk == auction.seller.user_id %}
+                            You cannot bid on your own auction.
+                        {% else %}
+                            Your bidder account must be verified and active to bid.
+                        {% endif %}
+                    </p>
+                {% else %}
+                    <p class="text-muted">Bidding is not currently open on this auction.</p>
+                {% endif %}
+
+                {% if auction.status == "CLOSED" or auction.status == "SETTLED" or auction.status == "COMPLETED" %}
+                    <hr>
+                    {% if auction.winner %}
+                        <p><strong>Winner:</strong> {{ auction.winner.username }} at {{ auction.final_price }}</p>
+                    {% else %}
+                        <p class="text-muted">No winner — reserve price not met or no bids received.</p>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

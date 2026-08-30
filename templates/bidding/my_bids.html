@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}My bids{% endblock %}
+{% block content %}
+<h2>My bids</h2>
+
+<h5>Auctions I've won</h5>
+{% if won_auctions %}
+<ul class="list-group mb-4">
+    {% for a in won_auctions %}
+        <li class="list-group-item"><a href="{% url 'auctions:detail' a.pk %}">{{ a.title }}</a> — {{ a.final_price }}</li>
+    {% endfor %}
+</ul>
+{% else %}<p class="text-muted">None yet.</p>{% endif %}
+
+<h5>All my bid activity</h5>
+<table class="table table-sm">
+    <thead><tr><th>Auction</th><th>Amount</th><th>Status</th><th>Placed</th></tr></thead>
+    <tbody>
+    {% for bid in my_bids %}
+        <tr>
+            <td><a href="{% url 'auctions:detail' bid.auction.pk %}">{{ bid.auction.title }}</a></td>
+            <td>{{ bid.amount }}</td>
+            <td>
+                {% if bid.auction.winner_id == user.id %}
+                    <span class="badge bg-success">Won</span>
+                {% elif bid.auction.status == "CLOSED" or bid.auction.status == "SETTLED" or bid.auction.status == "COMPLETED" %}
+                    <span class="badge bg-secondary">Lost</span>
+                {% elif bid.auction.current_highest_bid == bid.amount %}
+                    <span class="badge bg-primary">Leading</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark">Outbid</span>
+                {% endif %}
+            </td>
+            <td>{{ bid.created_at }}</td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="4" class="text-muted">No bids placed yet.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

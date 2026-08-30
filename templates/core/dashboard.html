@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h2>Welcome, {{ user.username }}</h2>
+<p class="text-muted">Role: {{ user.get_role_display }}</p>
+
+{% if user.role == "SELLER" %}
+    <p>
+        Verification status:
+        <span class="badge bg-{% if user.seller_profile.is_verified %}success{% else %}secondary{% endif %}">
+            {{ user.seller_profile.get_verification_status_display }}
+        </span>
+    </p>
+    <p><a href="{% url 'listings:my_listings' %}" class="btn btn-outline-primary btn-sm">My listings</a></p>
+    <p class="text-muted">Bid activity on your auctions appears here in Phase 6.</p>
+{% elif user.role == "BIDDER" %}
+    <p>
+        Verification status:
+        <span class="badge bg-{% if user.bidder_profile.is_verified %}success{% else %}secondary{% endif %}">
+            {{ user.bidder_profile.get_verification_status_display }}
+        </span>
+        &middot; Account: {{ user.bidder_profile.get_account_status_display }}
+    </p>
+    <p><a href="{% url 'bidding:my_bids' %}" class="btn btn-outline-primary btn-sm">My bids</a></p>
+{% elif user.is_officer_or_admin %}
+    <p>Administrator tools:</p>
+    <ul>
+        <li><a href="{% url 'accounts:verification_queue' %}">Seller & bidder verification queue</a></li>
+        <li><a href="{% url 'listings:approval_queue' %}">Auction listing approval queue</a></li>
+        <li class="text-muted">Disputes, audit log viewer — added in Phase 9-11.</li>
+    </ul>
+{% endif %}
+{% endblock %}
