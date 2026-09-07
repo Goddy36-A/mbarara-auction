@@ -1,331 +1,278 @@
 #!/usr/bin/env python
 """
-Mbarara Auction Platform — Local Startup
-Run: python start.py
-Does everything automatically. No manual config needed.
+One-click startup script for Mbarara Auction System.
+Automatically sets up venv, installs dependencies, runs migrations, and starts the server.
+
+Usage:
+    python start.py          # Full setup + run server
+    python start.py --reset  # Wipe database and start fresh
+    python start.py --help   # Show options
 """
-import os, sys, subprocess, time, webbrowser
+
+import os
+import sys
+import subprocess
+import platform
+import shutil
+import secrets
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
-ENV_FILE  = BASE_DIR / ".env"
-SETTINGS  = "config.settings.development"
-ADMIN     = {"username": "admin", "password": "Admin@12345", "email": "admin@mbarara-auction.ug"}
+# Color output for better UX
+class Color:
+    GREEN = '\033[92m'
+    BLUE = '\033[94m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    RESET = '\033[0m'
 
-# Set env var at module level — must be before any Django import
-os.environ["DJANGO_SETTINGS_MODULE"] = SETTINGS
+def print_step(msg):
+    print(f"{Color.BLUE}→ {msg}{Color.RESET}")
 
-GREEN  = "\033[92m"; RED = "\033[91m"; YELLOW = "\033[93m"
-RESET  = "\033[0m";  BOLD = "\033[1m"
+def print_success(msg):
+    print(f"{Color.GREEN}✓ {msg}{Color.RESET}")
 
-def ok(msg):   print(f"{GREEN}✅ {msg}{RESET}")
-def err(msg):  print(f"{RED}❌ {msg}{RESET}")
-def info(msg): print(f"{YELLOW}➜  {msg}{RESET}")
-def hdr(msg):  print(f"\n{BOLD}{msg}{RESET}")
+def print_warning(msg):
+    print(f"{Color.YELLOW}⚠ {msg}{Color.RESET}")
 
-def banner():
-    print(f"""
-{BOLD}╔══════════════════════════════════════════╗
-║       Mbarara Auction Platform           ║
-║       Local Development Setup           ║
-╚══════════════════════════════════════════╝{RESET}
-""")
+def print_error(msg):
+    print(f"{Color.RED}✗ {msg}{Color.RESET}")
+    sys.exit(1)
 
-def install_deps():
-    """Install packages one by one — skips any that fail (e.g. psycopg2 without PostgreSQL)."""
-    info("Installing dependencies...")
-    req_file = BASE_DIR / "requirements.txt"
-    if not req_file.exists():
-        print(f"{YELLOW}⚠️  requirements.txt not found — skipping{RESET}")
-        return
-
-    lines = req_file.read_text(encoding="utf-8").splitlines()
-    pkgs  = [l.strip() for l in lines if l.strip() and not l.strip().startswith("#")]
-
-    failed = []
-    for pkg in pkgs:
-        r = subprocess.run(
-            [sys.executable, "-m", "pip", "install", pkg, "-q",
-             "--only-binary=:all:", "--no-build-isolation"],
-            capture_output=True
-        )
-        if r.returncode != 0:
-            # Retry without binary restriction (some packages are fine)
-            r2 = subprocess.run(
-                [sys.executable, "-m", "pip", "install", pkg, "-q"],
-                capture_output=True
-            )
-            if r2.returncode != 0:
-                failed.append(pkg)
-                print(f"{YELLOW}  ⚠ Skipped (not available locally): {pkg}{RESET}")
-
-    if failed:
-        print(f"{YELLOW}  Skipped {len(failed)} package(s) that need native tools or servers.{RESET}")
-        print(f"{YELLOW}  This is normal for SQLite local setup.{RESET}")
-    ok("Dependencies ready")
-
-
-def fix_env():
-    """Create or patch .env for local SQLite development."""
-    if ENV_FILE.exists():
-        lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
-        patched, has_settings = [], False
-        for line in lines:
-            s = line.strip()
-            if s.startswith("DATABASE_URL=postgresql") or s.startswith("DATABASE_URL=postgres"):
-                patched.append("# " + line + "  # disabled for local SQLite")
-                ok("Disabled PostgreSQL DATABASE_URL → using SQLite")
-            elif s.startswith("REDIS_URL=") or s.startswith("CELERY_BROKER"):
-                patched.append("# " + line + "  # disabled locally — Celery runs in eager mode")
-            elif "DJANGO_SETTINGS_MODULE" in s and not s.startswith("#"):
-                patched.append("DJANGO_SETTINGS_MODULE=" + SETTINGS)
-                has_settings = True
-            else:
-                patched.append(line)
-        if not has_settings:
-            patched.append("DJANGO_SETTINGS_MODULE=" + SETTINGS)
-        # Add Celery eager mode so tasks work without Redis
-        content = "\n".join(patched)
-        if "CELERY_TASK_ALWAYS_EAGER" not in content:
-            patched.append("CELERY_TASK_ALWAYS_EAGER=True")
-        ENV_FILE.write_text("\n".join(patched), encoding="utf-8")
-    else:
-        ENV_FILE.write_text(
-            f"DJANGO_SETTINGS_MODULE={SETTINGS}\n"
-            "SECRET_KEY=django-insecure-mbarara-auction-local-dev\n"
-            "DEBUG=True\n"
-            "ALLOWED_HOSTS=localhost,127.0.0.1\n"
-            "CELERY_TASK_ALWAYS_EAGER=True\n",
-            encoding="utf-8"
-        )
-        ok(".env created for local development")
-
-def run(cmd, capture=False):
-    env = {**os.environ, "DJANGO_SETTINGS_MODULE": SETTINGS}
-    return subprocess.run(
-        [sys.executable, "manage.py"] + cmd,
-        cwd=BASE_DIR, env=env,
-        capture_output=capture, text=capture
-    )
-
-def migrate():
-    info("Running database migrations...")
-    run(["makemigrations"])
-    result = run(["migrate"])
-    if result.returncode != 0:
-        err("Migration failed. Check errors above.")
-        sys.exit(1)
-    ok("Migrations complete")
-
-def create_admin():
-    info("Setting up admin account...")
-    env = {
-        **os.environ,
-        "DJANGO_SETTINGS_MODULE": SETTINGS,
-        "DJANGO_SUPERUSER_USERNAME": ADMIN["username"],
-        "DJANGO_SUPERUSER_PASSWORD": ADMIN["password"],
-        "DJANGO_SUPERUSER_EMAIL":    ADMIN["email"],
-    }
-    r = subprocess.run(
-        [sys.executable, "manage.py", "createsuperuser", "--no-input"],
-        cwd=BASE_DIR, env=env, capture_output=True, text=True
-    )
-    if r.returncode == 0:
-        ok(f"Admin created  →  {ADMIN['username']} / {ADMIN['password']}")
-    elif "already exists" in (r.stderr + r.stdout):
-        ok(f"Admin exists  →  {ADMIN['username']} / {ADMIN['password']}")
-    else:
-        print(f"{YELLOW}⚠️  {r.stderr.strip() or r.stdout.strip()}{RESET}")
-
-    # Always reset admin password and role
+def run_command(cmd, check=True, shell=False):
+    """Run a shell command and return success status."""
     try:
-        import django; django.setup()
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        u = User.objects.get(username=ADMIN["username"])
-        u.set_password(ADMIN["password"])
-        u.role = "ADMIN"
-        u.is_staff = True
-        u.is_superuser = True
-        u.is_verified = True
-        u.save()
-        ok("Admin password confirmed and role set")
-    except Exception as e:
-        print(f"{YELLOW}⚠️  Admin reset: {e}{RESET}")
-
-def seed_demo_data():
-    """Seed realistic Mbarara auction demo data."""
-    hdr("Seeding demo data...")
-
-    import datetime
-    from django.contrib.auth import get_user_model
-    from django.utils import timezone
-    from apps.accounts.models import SellerProfile, BidderProfile
-    from apps.auctions.models  import AuctionCategory, Auction
-
-    User  = get_user_model()
-    now   = timezone.now()
-
-    # ── Auction Categories ───────────────────────────────────────────
-    categories_data = [
-        ("Land & Plots",             "land-plots"),
-        ("Residential Property",     "residential-property"),
-        ("Commercial Property",      "commercial-property"),
-        ("Motor Vehicles",           "motor-vehicles"),
-        ("Agricultural Equipment",   "agricultural-equipment"),
-        ("Livestock",                "livestock"),
-        ("Electronics & Appliances", "electronics-appliances"),
-        ("Business Assets",          "business-assets"),
-    ]
-    cats = {}
-    for name, slug in categories_data:
-        c, _ = AuctionCategory.objects.get_or_create(name=name, defaults={"slug": slug})
-        cats[slug] = c
-    ok(f"Categories ready ({len(cats)})")
-
-    # ── Demo Users ───────────────────────────────────────────────────
-    users_data = [
-        # (username, first, last, email, role, phone, password)
-        ("officer1",  "Grace",    "Tumuhairwe", "g.tumuhairwe@auction.ug", "OFFICER", "0772100001", "Pass@2025"),
-        ("seller1",   "Robert",   "Mugisha",    "r.mugisha@auction.ug",    "SELLER",  "0772100002", "Pass@2025"),
-        ("seller2",   "Patricia", "Nakato",     "p.nakato@auction.ug",     "SELLER",  "0772100003", "Pass@2025"),
-        ("bidder1",   "David",    "Ssemakula",  "d.ssemakula@auction.ug",  "BIDDER",  "0772100004", "Pass@2025"),
-        ("bidder2",   "Florence", "Auma",       "f.auma@auction.ug",       "BIDDER",  "0772100005", "Pass@2025"),
-        ("bidder3",   "Joseph",   "Okello",     "j.okello@auction.ug",     "BIDDER",  "0772100006", "Pass@2025"),
-    ]
-    created_users = {}
-    for (uname, fn, ln, email, role, phone, pwd) in users_data:
-        u, u_new = User.objects.get_or_create(
-            username=uname,
-            defaults={"email": email, "first_name": fn, "last_name": ln,
-                      "role": role, "phone_number": phone, "is_verified": True}
+        result = subprocess.run(
+            cmd,
+            shell=shell,
+            check=check,
+            cwd=os.getcwd(),
+            env=os.environ.copy()
         )
-        if u_new:
-            u.set_password(pwd); u.save()
-        created_users[uname] = u
+        return result.returncode == 0
+    except subprocess.CalledProcessError as e:
+        print_error(f"Command failed: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
+        return False
+    except FileNotFoundError:
+        return False
 
-        # Create profiles
-        if role == "SELLER":
-            SellerProfile.objects.get_or_create(user=u, defaults={"phone": phone})
-        elif role == "BIDDER":
-            BidderProfile.objects.get_or_create(
-                user=u,
-                defaults={"phone": phone, "location": "Mbarara",
-                          "verification_status": "VERIFIED", "account_status": "ACTIVE"}
-            )
-    ok(f"Demo users ready ({len(users_data)})")
+def get_python_executable():
+    """Get the Python executable path."""
+    if sys.platform == "win32":
+        return sys.executable
+    return sys.executable
 
-    # ── Demo Auctions ────────────────────────────────────────────────
-    auctions_data = [
-        {
-            "title":          "5-Acre Maize Farm — Rwampara",
-            "category":       "land-plots",
-            "seller":         "seller1",
-            "starting_price": 45_000_000,
-            "location":       "Rwampara, Mbarara",
-            "start_offset":   -2,   # started 2 hours ago
-            "end_offset":     22,   # ends in 22 hours
-            "status":         "LIVE",
-        },
-        {
-            "title":          "Toyota Land Cruiser V8 — 2018",
-            "category":       "motor-vehicles",
-            "seller":         "seller1",
-            "starting_price": 120_000_000,
-            "location":       "Mbarara Municipality",
-            "start_offset":   -1,
-            "end_offset":     47,
-            "status":         "LIVE",
-        },
-        {
-            "title":          "Commercial Plot — Mbarara City Centre",
-            "category":       "commercial-property",
-            "seller":         "seller2",
-            "starting_price": 200_000_000,
-            "location":       "Mbarara City",
-            "start_offset":   24,
-            "end_offset":     72,
-            "status":         "APPROVED",
-        },
-        {
-            "title":          "10 Friesian Dairy Cows",
-            "category":       "livestock",
-            "seller":         "seller2",
-            "starting_price": 15_000_000,
-            "location":       "Kiruhura District",
-            "start_offset":   -5,
-            "end_offset":     3,
-            "status":         "LIVE",
-        },
-        {
-            "title":          "Residential House — 4 Bedrooms, Ruti",
-            "category":       "residential-property",
-            "seller":         "seller1",
-            "starting_price": 180_000_000,
-            "location":       "Ruti, Mbarara",
-            "start_offset":   48,
-            "end_offset":     120,
-            "status":         "SUBMITTED",
-        },
-    ]
-    auction_count = 0
-    for a in auctions_data:
-        try:
-            seller_user = created_users[a["seller"]]
-            seller_profile = SellerProfile.objects.get(user=seller_user)
-            _, created = Auction.objects.get_or_create(
-                title=a["title"],
-                defaults={
-                    "seller":         seller_profile,
-                    "category":       cats[a["category"]],
-                    "location":       a["location"],
-                    "starting_price": a["starting_price"],
-                    "start_time":     now + datetime.timedelta(hours=a["start_offset"]),
-                    "end_time":       now + datetime.timedelta(hours=a["end_offset"]),
-                    "status":         a["status"],
-                }
-            )
-            if created: auction_count += 1
-        except Exception as e:
-            print(f"{YELLOW}⚠️  Auction '{a['title']}': {e}{RESET}")
+def get_venv_activate():
+    """Get the path to venv activate script."""
+    venv_path = Path(".venv")
+    if sys.platform == "win32":
+        return venv_path / "Scripts" / "activate.bat"
+    return venv_path / "bin" / "activate"
 
-    ok(f"Demo auctions ready ({auction_count} new)")
+def create_venv():
+    """Create virtual environment if it doesn't exist."""
+    venv_path = Path(".venv")
+    if venv_path.exists():
+        print_success("Virtual environment already exists")
+        return True
 
-    hdr("Demo data ready.")
-    print(f"""
-  {BOLD}Presentation accounts:{RESET}
-  ┌─────────────┬──────────────┬──────────────────────┐
-  │ Username    │ Password     │ Role                 │
-  ├─────────────┼──────────────┼──────────────────────┤
-  │ admin       │ Admin@12345  │ Administrator        │
-  │ officer1    │ Pass@2025    │ Auction Officer      │
-  │ seller1     │ Pass@2025    │ Seller               │
-  │ seller2     │ Pass@2025    │ Seller               │
-  │ bidder1     │ Pass@2025    │ Bidder               │
-  │ bidder2     │ Pass@2025    │ Bidder               │
-  └─────────────┴──────────────┴──────────────────────┘
-""")
+    print_step("Creating virtual environment...")
+    if not run_command([sys.executable, "-m", "venv", ".venv"]):
+        print_error("Failed to create virtual environment")
+    print_success("Virtual environment created")
+    return True
 
-def start_server():
-    url = "http://127.0.0.1:8000"
-    print(f"""
-{BOLD}🚀 Server starting...{RESET}
-   App:   {url}
-   Admin: {url}/admin
-   Stop   →  Ctrl+C
+def get_pip_executable():
+    """Get pip executable for the venv."""
+    venv_path = Path(".venv")
+    if sys.platform == "win32":
+        return venv_path / "Scripts" / "pip.exe"
+    return venv_path / "bin" / "pip"
 
-   Note: Celery runs in eager mode locally (no Redis needed).
-         Auction lifecycle tasks execute synchronously.
-""")
-    time.sleep(1)
-    webbrowser.open(url)
-    run(["runserver"])
+def install_dependencies():
+    """Install project dependencies."""
+    print_step("Installing dependencies...")
+    pip_exe = get_pip_executable()
+    
+    # Upgrade pip
+    run_command([str(pip_exe), "install", "--upgrade", "pip", "setuptools", "wheel"], check=False)
+    
+    # Install requirements
+    if not run_command([str(pip_exe), "install", "-r", "requirements.txt"]):
+        print_error("Failed to install dependencies")
+    print_success("Dependencies installed")
+    return True
+
+def create_env_file():
+    """Create .env file from .env.example if it doesn't exist."""
+    env_file = Path(".env")
+    env_example = Path(".env.example")
+    
+    if env_file.exists():
+        print_success(".env file already exists")
+        return True
+    
+    if not env_example.exists():
+        print_warning(".env.example not found, creating minimal .env")
+        secret_key = secrets.token_urlsafe(50)
+        env_content = f"""DJANGO_SETTINGS_MODULE=config.settings.development
+SECRET_KEY={secret_key}
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+DATABASE_URL=sqlite:///db.sqlite3
+CSRF_TRUSTED_ORIGINS=http://localhost:8000
+EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+CELERY_TASK_ALWAYS_EAGER=True
+SQL_DEBUG_LEVEL=WARNING
+"""
+    else:
+        print_step("Creating .env from .env.example...")
+        env_content = env_example.read_text()
+        secret_key = secrets.token_urlsafe(50)
+        env_content = env_content.replace("change-me-to-a-long-random-string", secret_key)
+        env_content = env_content.replace(
+            "DATABASE_URL=postgres://auction_user:auction_pass@localhost:5432/mbarara_auction",
+            "DATABASE_URL=sqlite:///db.sqlite3"
+        )
+        env_content += f"\nCELERY_TASK_ALWAYS_EAGER=True\nSQL_DEBUG_LEVEL=WARNING\n"
+    
+    env_file.write_text(env_content)
+    print_success(".env file created")
+    return True
+
+def run_migrations():
+    """Run Django migrations."""
+    print_step("Running database migrations...")
+    python_exe = get_python_executable()
+    
+    if not run_command([python_exe, "manage.py", "migrate"]):
+        print_error("Failed to run migrations")
+    print_success("Migrations completed")
+    return True
+
+def create_superuser():
+    """Create superuser if it doesn't exist."""
+    print_step("Checking for superuser...")
+    python_exe = get_python_executable()
+    
+    # Check if any superuser exists
+    check_cmd = f"""python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); exit(0 if User.objects.filter(is_superuser=True).exists() else 1)"""
+    
+    if run_command([python_exe, "manage.py", "shell", "-c", 
+                    "from django.contrib.auth import get_user_model; User = get_user_model(); import sys; sys.exit(0 if User.objects.filter(is_superuser=True).exists() else 1)"],
+                   check=False):
+        print_success("Superuser already exists")
+        return True
+    
+    print_step("No superuser found. Creating one...")
+    print(f"{Color.YELLOW}Enter superuser credentials:{Color.RESET}")
+    
+    username = input("Username [admin]: ").strip() or "admin"
+    email = input("Email [admin@localhost]: ").strip() or "admin@localhost"
+    password = input("Password: ").strip()
+    
+    if not password:
+        print_error("Password cannot be empty")
+    
+    create_cmd = f"""from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='{username}').delete(); User.objects.create_superuser('{username}', '{email}', '{password}')"""
+    
+    if not run_command([python_exe, "manage.py", "shell", "-c", create_cmd], check=False):
+        print_warning("Could not auto-create superuser. You can create one manually after startup.")
+        return False
+    
+    print_success(f"Superuser '{username}' created")
+    return True
+
+def reset_database():
+    """Reset database and start fresh."""
+    print_step("Resetting database...")
+    db_file = Path("db.sqlite3")
+    
+    if db_file.exists():
+        db_file.unlink()
+        print_success("Database deleted")
+    
+    run_migrations()
+    create_superuser()
+    print_success("Database reset complete")
+
+def run_server():
+    """Start Django development server."""
+    print_step("Starting development server...")
+    print(f"{Color.GREEN}")
+    print("="*60)
+    print("Mbarara Auction System is running!")
+    print("="*60)
+    print(f"Visit: {Color.BLUE}http://localhost:8000{Color.GREEN}")
+    print(f"Admin: {Color.BLUE}http://localhost:8000/admin{Color.GREEN}")
+    print("Press CTRL+C to stop")
+    print(f"{Color.RESET}")
+    
+    python_exe = get_python_executable()
+    try:
+        subprocess.run([python_exe, "manage.py", "runserver"], check=False)
+    except KeyboardInterrupt:
+        print(f"\n{Color.YELLOW}Server stopped.{Color.RESET}")
+        sys.exit(0)
+
+def main():
+    """Main setup and startup flow."""
+    print(f"{Color.BLUE}")
+    print("="*60)
+    print("Mbarara Auction System - Auto Setup")
+    print("="*60)
+    print(f"{Color.RESET}")
+    
+    # Handle command-line arguments
+    reset_mode = "--reset" in sys.argv
+    help_mode = "--help" in sys.argv or "-h" in sys.argv
+    
+    if help_mode:
+        print(f"""{Color.BLUE}Usage:{Color.RESET}
+    python start.py              # Full setup + run server
+    python start.py --reset      # Wipe database and start fresh
+    python start.py --help       # Show this message
+
+{Color.BLUE}What it does:{Color.RESET}
+    1. Creates virtual environment (if needed)
+    2. Installs dependencies
+    3. Creates .env file (if needed)
+    4. Runs database migrations
+    5. Creates superuser (if needed)
+    6. Starts development server
+
+{Color.BLUE}After startup:{Color.RESET}
+    • Visit http://localhost:8000
+    • Log in with your superuser account at http://localhost:8000/admin
+    • Press CTRL+C to stop the server
+        """)
+        return
+    
+    # Check Python version
+    if sys.version_info < (3, 8):
+        print_error(f"Python 3.8+ required. You have {sys.version}")
+    
+    # Setup steps
+    try:
+        if not create_venv():
+            return
+        if not install_dependencies():
+            return
+        if not create_env_file():
+            return
+        
+        if reset_mode:
+            reset_database()
+        else:
+            if not run_migrations():
+                return
+            create_superuser()
+        
+        run_server()
+    except KeyboardInterrupt:
+        print(f"\n{Color.YELLOW}Setup cancelled.{Color.RESET}")
+        sys.exit(1)
+    except Exception as e:
+        print_error(f"Unexpected error: {e}")
 
 if __name__ == "__main__":
-    banner()
-    install_deps()
-    fix_env()
-    migrate()
-    create_admin()
-    seed_demo_data()
-    start_server()
+    main()
