@@ -96,9 +96,14 @@ def install_dependencies():
     # Upgrade pip
     run_command([str(pip_exe), "install", "--upgrade", "pip", "setuptools", "wheel"], check=False)
     
-    # Install requirements
-    if not run_command([str(pip_exe), "install", "-r", "requirements.txt"]):
-        print_error("Failed to install dependencies")
+    # Install requirements-dev.txt (without psycopg2 for SQLite)
+    req_file = "requirements-dev.txt"
+    if not Path(req_file).exists():
+        req_file = "requirements.txt"
+    
+    print_step(f"Installing from {req_file}...")
+    if not run_command([str(pip_exe), "install", "-r", req_file]):
+        print_error(f"Failed to install dependencies from {req_file}")
     print_success("Dependencies installed")
     return True
 
@@ -111,29 +116,38 @@ def create_env_file():
         print_success(".env file already exists")
         return True
     
-    if not env_example.exists():
-        print_warning(".env.example not found, creating minimal .env")
-        secret_key = secrets.token_urlsafe(50)
-        env_content = f"""DJANGO_SETTINGS_MODULE=config.settings.development
+    print_step("Creating .env configuration...")
+    secret_key = secrets.token_urlsafe(50)
+    
+    env_content = f"""DJANGO_SETTINGS_MODULE=config.settings.development
 SECRET_KEY={secret_key}
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
+
+# SQLite database (no PostgreSQL needed)
 DATABASE_URL=sqlite:///db.sqlite3
+
 CSRF_TRUSTED_ORIGINS=http://localhost:8000
+
+# Email: console backend prints to terminal
 EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+EMAIL_HOST=
+EMAIL_PORT=587
+EMAIL_HOST_USER=
+EMAIL_HOST_PASSWORD=
+EMAIL_USE_TLS=True
+
+# Celery: run tasks synchronously (no Redis needed for dev)
 CELERY_TASK_ALWAYS_EAGER=True
+CELERY_TASK_EAGER_PROPAGATES=True
+REDIS_URL=redis://localhost:6379/0
+
+# Cache: use in-memory cache (fastest for dev)
+CACHE_BACKEND=locmem
+
+# Logging
 SQL_DEBUG_LEVEL=WARNING
 """
-    else:
-        print_step("Creating .env from .env.example...")
-        env_content = env_example.read_text()
-        secret_key = secrets.token_urlsafe(50)
-        env_content = env_content.replace("change-me-to-a-long-random-string", secret_key)
-        env_content = env_content.replace(
-            "DATABASE_URL=postgres://auction_user:auction_pass@localhost:5432/mbarara_auction",
-            "DATABASE_URL=sqlite:///db.sqlite3"
-        )
-        env_content += f"\nCELERY_TASK_ALWAYS_EAGER=True\nSQL_DEBUG_LEVEL=WARNING\n"
     
     env_file.write_text(env_content)
     print_success(".env file created")
@@ -155,8 +169,6 @@ def create_superuser():
     python_exe = get_python_executable()
     
     # Check if any superuser exists
-    check_cmd = f"""python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); exit(0 if User.objects.filter(is_superuser=True).exists() else 1)"""
-    
     if run_command([python_exe, "manage.py", "shell", "-c", 
                     "from django.contrib.auth import get_user_model; User = get_user_model(); import sys; sys.exit(0 if User.objects.filter(is_superuser=True).exists() else 1)"],
                    check=False):
@@ -234,7 +246,7 @@ def main():
 
 {Color.BLUE}What it does:{Color.RESET}
     1. Creates virtual environment (if needed)
-    2. Installs dependencies
+    2. Installs dependencies (SQLite-compatible)
     3. Creates .env file (if needed)
     4. Runs database migrations
     5. Creates superuser (if needed)
@@ -244,6 +256,9 @@ def main():
     • Visit http://localhost:8000
     • Log in with your superuser account at http://localhost:8000/admin
     • Press CTRL+C to stop the server
+
+{Color.BLUE}Database:{Color.RESET}
+    Uses SQLite (db.sqlite3) - no PostgreSQL required!
         """)
         return
     
