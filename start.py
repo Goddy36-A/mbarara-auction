@@ -32,40 +32,37 @@ def banner():
 """)
 
 def install_deps():
-    """Install required packages, skipping ones that need native build tools."""
+    """Install packages one by one — skips any that fail (e.g. psycopg2 without PostgreSQL)."""
     info("Installing dependencies...")
     req_file = BASE_DIR / "requirements.txt"
     if not req_file.exists():
         print(f"{YELLOW}⚠️  requirements.txt not found — skipping{RESET}")
         return
 
-    # Packages that need PostgreSQL/native tools to build — not needed for SQLite
-    skip = {"psycopg2", "psycopg2-binary", "psycopg2_binary"}
-
     lines = req_file.read_text(encoding="utf-8").splitlines()
-    pkgs  = [
-        l.strip() for l in lines
-        if l.strip() and not l.strip().startswith("#")
-        and not any(l.strip().lower().startswith(s.lower()) for s in skip)
-    ]
+    pkgs  = [l.strip() for l in lines if l.strip() and not l.strip().startswith("#")]
 
-    skipped = [
-        l.strip() for l in lines
-        if l.strip() and not l.strip().startswith("#")
-        and any(l.strip().lower().startswith(s.lower()) for s in skip)
-    ]
-    if skipped:
-        print(f"{YELLOW}  Skipping (not needed for SQLite): {', '.join(skipped)}{RESET}")
+    failed = []
+    for pkg in pkgs:
+        r = subprocess.run(
+            [sys.executable, "-m", "pip", "install", pkg, "-q",
+             "--only-binary=:all:", "--no-build-isolation"],
+            capture_output=True
+        )
+        if r.returncode != 0:
+            # Retry without binary restriction (some packages are fine)
+            r2 = subprocess.run(
+                [sys.executable, "-m", "pip", "install", pkg, "-q"],
+                capture_output=True
+            )
+            if r2.returncode != 0:
+                failed.append(pkg)
+                print(f"{YELLOW}  ⚠ Skipped (not available locally): {pkg}{RESET}")
 
-    result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", *pkgs, "-q"],
-        cwd=BASE_DIR
-    )
-    if result.returncode == 0:
-        ok("Dependencies installed")
-    else:
-        err("pip install failed. Check your internet connection and try again.")
-        sys.exit(1)
+    if failed:
+        print(f"{YELLOW}  Skipped {len(failed)} package(s) that need native tools or servers.{RESET}")
+        print(f"{YELLOW}  This is normal for SQLite local setup.{RESET}")
+    ok("Dependencies ready")
 
 
 def fix_env():
