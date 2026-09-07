@@ -32,21 +32,41 @@ def banner():
 """)
 
 def install_deps():
-    """Install all required packages before anything else."""
-    info("Installing dependencies from requirements.txt...")
+    """Install required packages, skipping ones that need native build tools."""
+    info("Installing dependencies...")
     req_file = BASE_DIR / "requirements.txt"
     if not req_file.exists():
         print(f"{YELLOW}⚠️  requirements.txt not found — skipping{RESET}")
         return
+
+    # Packages that need PostgreSQL/native tools to build — not needed for SQLite
+    skip = {"psycopg2", "psycopg2-binary", "psycopg2_binary"}
+
+    lines = req_file.read_text(encoding="utf-8").splitlines()
+    pkgs  = [
+        l.strip() for l in lines
+        if l.strip() and not l.strip().startswith("#")
+        and not any(l.strip().lower().startswith(s.lower()) for s in skip)
+    ]
+
+    skipped = [
+        l.strip() for l in lines
+        if l.strip() and not l.strip().startswith("#")
+        and any(l.strip().lower().startswith(s.lower()) for s in skip)
+    ]
+    if skipped:
+        print(f"{YELLOW}  Skipping (not needed for SQLite): {', '.join(skipped)}{RESET}")
+
     result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-r", str(req_file), "-q"],
+        [sys.executable, "-m", "pip", "install", *pkgs, "-q"],
         cwd=BASE_DIR
     )
     if result.returncode == 0:
         ok("Dependencies installed")
     else:
-        err("pip install failed. Check your internet connection.")
+        err("pip install failed. Check your internet connection and try again.")
         sys.exit(1)
+
 
 def fix_env():
     """Create or patch .env for local SQLite development."""
