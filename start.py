@@ -31,6 +31,23 @@ def banner():
 ╚══════════════════════════════════════════╝{RESET}
 """)
 
+def install_deps():
+    """Install all required packages before anything else."""
+    info("Installing dependencies from requirements.txt...")
+    req_file = BASE_DIR / "requirements.txt"
+    if not req_file.exists():
+        print(f"{YELLOW}⚠️  requirements.txt not found — skipping{RESET}")
+        return
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-r", str(req_file), "-q"],
+        cwd=BASE_DIR
+    )
+    if result.returncode == 0:
+        ok("Dependencies installed")
+    else:
+        err("pip install failed. Check your internet connection.")
+        sys.exit(1)
+
 def fix_env():
     """Create or patch .env for local SQLite development."""
     if ENV_FILE.exists():
@@ -289,6 +306,7 @@ def start_server():
 
 if __name__ == "__main__":
     banner()
+    install_deps()
     fix_env()
     migrate()
     create_admin()
