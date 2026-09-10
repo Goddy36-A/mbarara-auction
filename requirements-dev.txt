@@ -1,14 +1,14 @@
+celery==5.4.0
+crispy-bootstrap5==2.0.2
 Django==5.0.6
+django-celery-beat==2.6.0
+django-crispy-forms==2.1
 django-environ==0.11.2
 djangorestframework==3.15.1
-django-crispy-forms==2.1
-crispy-bootstrap5==2024.2
-Pillow==11.0.0
 gunicorn==22.0.0
-whitenoise==6.6.0
-celery==5.4.0
+Pillow==11.0.0
 redis==5.0.4
-django-celery-beat==2.6.0
+whitenoise==6.6.0
 
 # SQLite development - no PostgreSQL or build dependencies needed
-# cache-bust: 2026-09-07-v2
+# cache-bust: 2026-09-10
