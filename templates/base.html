@@ -29,6 +29,11 @@
                     {% if user.is_authenticated and user.is_officer_or_admin %}
                         <li class="nav-item"><a class="nav-link" href="{% url 'listings:approval_queue' %}">Approval Queue</a></li>
                         <li class="nav-item"><a class="nav-link" href="{% url 'payments:queue' %}">Payment Queue</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'disputes:queue' %}">Disputes</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'reports:dashboard' %}">Reports</a></li>
+                    {% endif %}
+                    {% if user.is_authenticated and not user.is_officer_or_admin %}
+                        <li class="nav-item"><a class="nav-link" href="{% url 'disputes:mine' %}">My Disputes</a></li>
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav ms-auto">

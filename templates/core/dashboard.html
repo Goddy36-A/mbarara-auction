@@ -27,7 +27,9 @@
     <ul>
         <li><a href="{% url 'accounts:verification_queue' %}">Seller & bidder verification queue</a></li>
         <li><a href="{% url 'listings:approval_queue' %}">Auction listing approval queue</a></li>
-        <li class="text-muted">Disputes, audit log viewer — added in Phase 9-11.</li>
+        <li><a href="{% url 'disputes:queue' %}">Open disputes</a></li>
+        <li><a href="{% url 'reports:dashboard' %}">Reports &amp; analytics</a></li>
+        <li class="text-muted">Audit log viewer is available in Django Admin.</li>
     </ul>
 {% endif %}
 {% endblock %}

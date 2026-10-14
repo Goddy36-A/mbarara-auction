@@ -7,12 +7,12 @@ documents) that this codebase implements.
 
 ## Project status
 
-This repository currently implements **Phases 3-8**: Django Foundation,
+This repository currently implements **Phases 3-10**: Django Foundation,
 Users/Roles, Auction Management (listings, categories, images, approval
 workflow, lifecycle state machine), the Bidding Engine (concurrency-safe
 bid placement, privacy-preserving bid history, automated closing & winner
 determination), Notifications (in-app inbox with async delivery
-plumbing), and Payments (status tracking only — no real gateway).
+plumbing), Payments (status tracking only — no real gateway), Disputes, and Reports.
 
 - [x] Project scaffold & modular app structure (`apps/*`)
 - [x] Settings split: `base` / `development` / `testing` / `production`
@@ -45,8 +45,13 @@ plumbing), and Payments (status tracking only — no real gateway).
   - [x] `mark_paid` advances the auction CLOSED → SETTLED and notifies both buyer and seller
   - [x] Officer/admin payment-recording queue, plus read-only "my payments" (bidder) and "payments received" (seller) views
   - [x] No real payment gateway — method/reference are free-text fields an officer fills in after confirming payment out-of-band
-- [ ] Disputes — **Phase 9**
-- [ ] Reports & analytics — **Phase 10**
+- [x] Disputes — **Phase 9**
+  - [x] `Dispute` model; one active dispute per auction (DB constraint); only CLOSED/SETTLED auctions can be disputed, only by the seller, winner or a bidder on it
+  - [x] `apps/disputes/services.py`: `open_dispute` (auction -> DISPUTED), `take_for_review`, `resolve_dispute` (notes required; auction returns to CLOSED, or SETTLED if previously settled; optional refund of a PAID payment) — all audit-logged and notified
+  - [x] Participant views (raise, detail, my disputes) and officer/admin queue + resolve screen
+- [x] Reports & analytics — **Phase 10**
+  - [x] Staff-only dashboard at `/reports/`: auctions by status, sell-through, sales value, bids, payments collected/outstanding, per-category figures, verification and dispute counts, with a date-range filter
+  - [x] CSV exports (`/reports/auctions.csv`, `/reports/payments.csv`) with spreadsheet-formula neutralisation
 - [ ] Security hardening — **Phase 11**
 - [ ] Test suite — **Phase 12**
 - [ ] Deployment hardening — **Phase 13**
@@ -158,8 +163,8 @@ apps/listings       — listing creation & approval workflow  (Phase 5)
 apps/bidding        — bid model & concurrency-safe service  (Phase 6)
 apps/notifications  — in-app notifications                  (Phase 7)
 apps/payments       — payment status tracking               (Phase 8)
-apps/disputes       — dispute workflow                      (Phase 9, pending)
-apps/reports        — reporting & analytics                 (Phase 10, pending)
+apps/disputes       — dispute workflow                      (Phase 9)
+apps/reports        — reporting & analytics                 (Phase 10)
 apps/audit          — immutable audit log
 apps/core           — shared base models, home/dashboard
 ```

@@ -239,3 +239,27 @@ def notify_payment_failed(payment, *, reason=""):
         obj=payment,
         link=f"/auctions/{auction.pk}/",
     )
+
+
+def notify_dispute_opened(dispute, recipient):
+    auction = dispute.auction
+    return notify(
+        recipient=recipient,
+        event=Notification.Event.DISPUTE_OPENED,
+        title="Dispute raised",
+        message=f"A dispute ({dispute.get_category_display()}) was raised on '{auction.title}'.",
+        obj=dispute,
+        link=f"/disputes/{dispute.pk}/",
+    )
+
+
+def notify_dispute_resolved(dispute, recipient):
+    auction = dispute.auction
+    return notify(
+        recipient=recipient,
+        event=Notification.Event.DISPUTE_RESOLVED,
+        title="Dispute resolved",
+        message=f"The dispute on '{auction.title}' was resolved: {dispute.get_outcome_display().lower()}.",
+        obj=dispute,
+        link=f"/disputes/{dispute.pk}/",
+    )

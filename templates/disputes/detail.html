@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Dispute #{{ dispute.pk }}{% endblock %}
+{% block content %}
+<h2>Dispute #{{ dispute.pk }} <span class="badge bg-secondary">{{ dispute.get_status_display }}</span></h2>
+<p class="text-muted">
+    Auction: <a href="{% url 'auctions:detail' dispute.auction.pk %}">{{ dispute.auction.title }}</a>
+    &middot; Raised by {{ dispute.raised_by.username }} on {{ dispute.created_at }}
+    &middot; {{ dispute.get_category_display }}
+</p>
+<div class="card mb-3"><div class="card-body">{{ dispute.description|linebreaks }}</div></div>
+
+{% if payment %}
+    <p>Payment: {{ payment.amount }} &middot; {{ payment.get_status_display }}</p>
+{% endif %}
+{% if dispute.assigned_to %}<p>Assigned to: {{ dispute.assigned_to.username }}</p>{% endif %}
+
+{% if dispute.status == "RESOLVED" %}
+    <div class="card"><div class="card-body">
+        <h5>Resolution: {{ dispute.get_outcome_display }}</h5>
+        {{ dispute.resolution_notes|linebreaks }}
+        <p class="text-muted mb-0">By {{ dispute.resolved_by.username }} on {{ dispute.resolved_at }}{% if dispute.refunded %} &middot; payment refunded{% endif %}</p>
+    </div></div>
+{% elif is_staff %}
+    {% if dispute.status == "OPEN" %}
+        <form method="post" action="{% url 'disputes:take' dispute.pk %}" class="mb-3">
+            {% csrf_token %}
+            <button class="btn btn-outline-dark btn-sm" type="submit">Take for review</button>
+        </form>
+    {% endif %}
+    <form method="post" action="{% url 'disputes:resolve' dispute.pk %}" class="col-md-8">
+        {% csrf_token %}
+        <h5>Resolve</h5>
+        <div class="mb-2">
+            <label class="form-label">Outcome</label>
+            <select name="outcome" class="form-select" required>
+                {% for value, label in outcomes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="mb-2">
+            <label class="form-label">Resolution notes (required)</label>
+            <textarea name="notes" rows="3" class="form-control" required></textarea>
+        </div>
+        {% if payment and payment.status == "PAID" %}
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="refund" id="refund">
+            <label class="form-check-label" for="refund">Record the payment as refunded</label>
+        </div>
+        {% endif %}
+        <button class="btn btn-dark" type="submit">Resolve dispute</button>
+    </form>
+{% else %}
+    <p class="text-muted">Staff are reviewing this dispute. You will be notified when it is resolved.</p>
+{% endif %}
+{% endblock %}

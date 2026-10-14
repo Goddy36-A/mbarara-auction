@@ -79,6 +79,11 @@
                         <p class="text-muted">No winner — reserve price not met or no bids received.</p>
                     {% endif %}
                 {% endif %}
+
+                {% if can_dispute %}
+                    <hr>
+                    <a href="{% url 'disputes:create' auction.pk %}" class="btn btn-outline-secondary btn-sm">Raise a dispute</a>
+                {% endif %}
             </div>
         </div>
     </div>

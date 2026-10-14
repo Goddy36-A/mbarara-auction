@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 
 from apps.bidding.services import get_bid_history
+from apps.disputes.services import can_raise_dispute
 
 from .models import Auction, AuctionCategory
 
@@ -73,5 +74,6 @@ def detail(request, pk):
             "bid_history": get_bid_history(auction, viewer=request.user),
             "minimum_permitted": minimum_permitted,
             "can_bid": can_bid,
+            "can_dispute": can_raise_dispute(request.user, auction),
         },
     )

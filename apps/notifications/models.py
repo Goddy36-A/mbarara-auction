@@ -30,6 +30,8 @@ class Notification(models.Model):
         ACCOUNT_REACTIVATED = "ACCOUNT_REACTIVATED", "Account reactivated"
         PAYMENT_RECEIVED = "PAYMENT_RECEIVED", "Payment received"
         PAYMENT_FAILED = "PAYMENT_FAILED", "Payment marked failed"
+        DISPUTE_OPENED = "DISPUTE_OPENED", "Dispute raised"
+        DISPUTE_RESOLVED = "DISPUTE_RESOLVED", "Dispute resolved"
 
     class Channel(models.TextChoices):
         IN_APP = "IN_APP", "In-app"
