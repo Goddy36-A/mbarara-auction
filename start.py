@@ -197,6 +197,28 @@ def create_superuser():
     print_success(f"Superuser '{username}' created")
     return True
 
+
+def seed_demo_data():
+    """Load demo categories, users and auctions (skip with --no-seed).
+
+    seed_demo is idempotent: existing demo records are skipped, so this is
+    safe to run on every start.
+    """
+    if "--no-seed" in sys.argv:
+        print_warning("Skipping demo data (--no-seed)")
+        return True
+
+    print_step("Loading demo data...")
+    python_exe = get_python_executable()
+
+    if not run_command([python_exe, "manage.py", "seed_demo"], check=False):
+        print_warning("Demo data could not be loaded. Run 'python manage.py seed_demo' to see the error.")
+        return False
+
+    print_success("Demo data loaded")
+    return True
+
+
 def reset_database():
     """Reset database and start fresh."""
     print_step("Resetting database...")
@@ -250,6 +272,7 @@ def main():
         print(f"""{Color.BLUE}Usage:{Color.RESET}
     python start.py              # Full setup + run server
     python start.py --reset      # Wipe database and start fresh
+    python start.py --no-seed    # Start without loading demo data
     python start.py --help       # Show this message
 
 {Color.BLUE}What it does:{Color.RESET}
@@ -258,7 +281,8 @@ def main():
     3. Creates .env file (if needed)
     4. Runs database migrations
     5. Creates superuser (if needed)
-    6. Starts development server
+    6. Loads demo data (skip with --no-seed)
+    7. Starts development server
 
 {Color.BLUE}After startup:{Color.RESET}
     • Visit http://localhost:8000
@@ -289,7 +313,8 @@ def main():
             if not run_migrations():
                 return
             create_superuser()
-        
+
+        seed_demo_data()
         run_server()
     except KeyboardInterrupt:
         print(f"\n{Color.YELLOW}Setup cancelled.{Color.RESET}")
