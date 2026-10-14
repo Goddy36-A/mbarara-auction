@@ -59,3 +59,4 @@ can't call the GitHub API directly to push commits from here. Two options:
   - A bid amount of `NaN`, `Infinity`, an oversized value, or more than 2 decimal places caused a 500. `place_bid` now validates the amount.
   - Officers/admins opening `/bids/mine/`, `/payments/received/` or `/listings/mine/` got a 500 (no bidder/seller profile). They now see empty lists, and cannot open the create-listing form (403).
   - `test_inbox_only_shows_own_notifications` asserted the page never contains the letter "b"; it now checks for the other user's notification link.
+- `requirements.txt` could not be installed as pinned (`crispy-bootstrap5==2026.9` needs `django-crispy-forms>=2.3` and `Django>=5.2`, while `django-celery-beat==2.6.0` caps Django below 5.2). Loosened to `django-crispy-forms>=2.6,<3` and `django-celery-beat>=2.8,<3`; `pip install -r requirements.txt` now resolves.
