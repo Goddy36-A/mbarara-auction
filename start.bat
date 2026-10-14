@@ -24,3 +24,18 @@ if %errorlevel% neq 0 (
 
 REM Run the Python startup script
 python start.py %*
+set EXITCODE=%errorlevel%
+
+echo.
+if %EXITCODE% neq 0 (
+    echo ============================================================
+    echo Setup stopped with an error, code %EXITCODE%.
+    echo Read the messages above to see what went wrong.
+    echo ============================================================
+) else (
+    echo Server stopped.
+)
+
+REM Keep the window open so the messages can be read
+pause
+exit /b %EXITCODE%

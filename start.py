@@ -56,10 +56,13 @@ def run_command(cmd, check=True, shell=False):
         return False
 
 def get_python_executable():
-    """Get the Python executable path."""
-    if sys.platform == "win32":
-        return sys.executable
-    return sys.executable
+    """Python of the project's virtual environment (falls back to the current one).
+
+    Django and the other packages are installed into .venv, so manage.py must
+    run with that interpreter, not with whatever Python started this script.
+    """
+    venv_python = Path(".venv") / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    return str(venv_python.absolute()) if venv_python.exists() else sys.executable
 
 def get_venv_activate():
     """Get the path to venv activate script."""
@@ -91,10 +94,10 @@ def get_pip_executable():
 def install_dependencies():
     """Install project dependencies."""
     print_step("Installing dependencies...")
-    pip_exe = get_pip_executable()
+    python_exe = get_python_executable()
     
-    # Upgrade pip
-    run_command([str(pip_exe), "install", "--upgrade", "pip", "setuptools", "wheel"], check=False)
+    # Upgrade pip (via "python -m pip": Windows cannot replace a running pip.exe)
+    run_command([python_exe, "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"], check=False)
     
     # Install requirements-dev.txt (without psycopg2 for SQLite)
     req_file = "requirements-dev.txt"
@@ -102,7 +105,7 @@ def install_dependencies():
         req_file = "requirements.txt"
     
     print_step(f"Installing from {req_file}...")
-    if not run_command([str(pip_exe), "install", "-r", req_file]):
+    if not run_command([python_exe, "-m", "pip", "install", "-r", req_file]):
         print_error(f"Failed to install dependencies from {req_file}")
     print_success("Dependencies installed")
     return True
@@ -228,6 +231,11 @@ def run_server():
 
 def main():
     """Main setup and startup flow."""
+    # Always work from the project folder, even if started from elsewhere
+    os.chdir(Path(__file__).resolve().parent)
+    # Make colour codes work in the Windows console
+    if sys.platform == "win32":
+        os.system("")
     print(f"{Color.BLUE}")
     print("="*60)
     print("Mbarara Auction System - Auto Setup")
