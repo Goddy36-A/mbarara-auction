@@ -216,3 +216,64 @@ class DisputeViewTests(DisputeBase):
         self.assertContains(self.client.get(reverse("auctions:detail", args=[auction.pk])), "Raise a dispute")
         self.client.force_login(self.stranger)
         self.assertNotContains(self.client.get(reverse("auctions:detail", args=[auction.pk])), "Raise a dispute")
+
+
+class DisputeViewEdgeTests(DisputeBase):
+    def test_invalid_form_rerenders_without_creating(self):
+        auction = self.closed_auction()
+        self.client.force_login(self.winner)
+        resp = self.client.post(reverse("disputes:create", args=[auction.pk]), {"category": "BOGUS", "description": ""})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Dispute.objects.count(), 0)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Status.CLOSED)
+
+    def test_cannot_create_second_dispute_via_view(self):
+        auction = self.closed_auction()
+        open_dispute(auction, raised_by=self.winner, category="OTHER", description="x")
+        self.client.force_login(self.seller)
+        self.assertEqual(self.client.get(reverse("disputes:create", args=[auction.pk])).status_code, 403)
+
+    def test_take_view_assigns_officer_and_is_staff_only(self):
+        auction = self.closed_auction()
+        d = open_dispute(auction, raised_by=self.winner, category="OTHER", description="x")
+        self.client.force_login(self.winner)
+        self.assertEqual(self.client.post(reverse("disputes:take", args=[d.pk])).status_code, 403)
+        self.client.force_login(self.officer)
+        self.client.post(reverse("disputes:take", args=[d.pk]))
+        d.refresh_from_db()
+        self.assertEqual((d.status, d.assigned_to), (Dispute.Status.UNDER_REVIEW, self.officer))
+
+    def test_take_twice_is_rejected_gracefully(self):
+        auction = self.closed_auction()
+        d = open_dispute(auction, raised_by=self.winner, category="OTHER", description="x")
+        self.client.force_login(self.officer)
+        self.client.post(reverse("disputes:take", args=[d.pk]))
+        resp = self.client.post(reverse("disputes:take", args=[d.pk]), follow=True)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_resolve_without_notes_via_view_keeps_dispute_active(self):
+        auction = self.closed_auction()
+        d = open_dispute(auction, raised_by=self.winner, category="OTHER", description="x")
+        self.client.force_login(self.officer)
+        self.client.post(reverse("disputes:resolve", args=[d.pk]), {"outcome": "UPHELD", "notes": ""})
+        d.refresh_from_db()
+        self.assertTrue(d.is_active)
+
+    def test_refund_checkbox_via_view(self):
+        auction = self.closed_auction()
+        mark_paid(Payment.objects.get(auction=auction), actor=self.officer, method="Cash")
+        auction.refresh_from_db()
+        d = open_dispute(auction, raised_by=self.winner, category="NOT_DELIVERED", description="x")
+        self.client.force_login(self.officer)
+        self.client.post(reverse("disputes:resolve", args=[d.pk]), {"outcome": "UPHELD", "notes": "Refund due", "refund": "on"})
+        self.assertEqual(Payment.objects.get(auction=auction).status, Payment.Status.REFUNDED)
+
+    def test_resolved_dispute_detail_shows_outcome(self):
+        auction = self.closed_auction()
+        d = open_dispute(auction, raised_by=self.winner, category="OTHER", description="x")
+        resolve_dispute(d, actor=self.officer, outcome="DISMISSED", notes="Checked the records")
+        self.client.force_login(self.winner)
+        resp = self.client.get(reverse("disputes:detail", args=[d.pk]))
+        self.assertContains(resp, "Checked the records")
+        self.assertContains(resp, "Complaint dismissed")

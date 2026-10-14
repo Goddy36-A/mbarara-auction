@@ -59,5 +59,9 @@ class SellerPaymentsView(SellerRequiredMixin, View):
     """A seller's own record of payments due/received on their auctions."""
 
     def get(self, request):
-        payments = Payment.objects.filter(auction__seller=request.user.seller_profile).select_related("auction")
+        profile = getattr(request.user, "seller_profile", None)
+        payments = (
+            Payment.objects.filter(auction__seller=profile).select_related("auction")
+            if profile else Payment.objects.none()
+        )
         return render(request, "payments/seller_payments.html", {"payments": payments})

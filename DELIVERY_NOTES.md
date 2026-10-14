@@ -48,3 +48,14 @@ can't call the GitHub API directly to push commits from here. Two options:
    it and let you pick it from a connector prompt rather than acting on a
    token pasted in plain chat text either way, since that's not a safe way
    to hand over a credential.
+
+
+## Update — Phases 9, 10 and 12
+
+- Migrations now exist and are committed (`disputes/0001`, `notifications/0002` are new).
+- The full suite (225 tests) was run to completion on SQLite and passes. It has **not** been run on PostgreSQL, so row-locking behaviour (`select_for_update`) is untested under real concurrency.
+- Bugs found and fixed by the new tests:
+  - Password change and password reset crashed (`NoReverseMatch`) because the namespaced `accounts` URLs didn't match Django's default redirect names. Fixed with explicit `success_url`s and a namespaced reset-email template.
+  - A bid amount of `NaN`, `Infinity`, an oversized value, or more than 2 decimal places caused a 500. `place_bid` now validates the amount.
+  - Officers/admins opening `/bids/mine/`, `/payments/received/` or `/listings/mine/` got a 500 (no bidder/seller profile). They now see empty lists, and cannot open the create-listing form (403).
+  - `test_inbox_only_shows_own_notifications` asserted the page never contains the letter "b"; it now checks for the other user's notification link.

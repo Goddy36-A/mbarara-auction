@@ -18,9 +18,20 @@ def _own_draft_or_403(request, pk):
     return auction
 
 
+def _seller_profile_or_403(user):
+    """Officers/admins pass the role check but have no seller profile."""
+    profile = getattr(user, "seller_profile", None)
+    if profile is None:
+        raise PermissionDenied("Only seller accounts can create listings.")
+    return profile
+
+
 class MyListingsView(SellerRequiredMixin, View):
     def get(self, request):
-        auctions = Auction.objects.filter(seller=request.user.seller_profile).order_by("-created_at")
+        profile = getattr(request.user, "seller_profile", None)
+        auctions = (
+            Auction.objects.filter(seller=profile).order_by("-created_at") if profile else Auction.objects.none()
+        )
         return render(request, "listings/my_listings.html", {"auctions": auctions})
 
 
@@ -28,14 +39,16 @@ class AuctionCreateView(SellerRequiredMixin, View):
     template_name = "listings/auction_form.html"
 
     def get(self, request):
+        _seller_profile_or_403(request.user)
         form = AuctionForm()
         return render(request, self.template_name, {"form": form, "formset": None})
 
     def post(self, request):
+        profile = _seller_profile_or_403(request.user)
         form = AuctionForm(request.POST)
         if form.is_valid():
             auction = form.save(commit=False)
-            auction.seller = request.user.seller_profile
+            auction.seller = profile
             auction.status = Auction.Status.DRAFT
             auction.save()
             formset = AuctionImageFormSet(request.POST, request.FILES, instance=auction)

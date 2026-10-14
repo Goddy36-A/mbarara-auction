@@ -212,8 +212,8 @@ class InboxViewTests(TestCase):
     def test_inbox_only_shows_own_notifications(self):
         self.client.login(username="inboxuser1", password="x")
         response = self.client.get(reverse("notifications:inbox"))
-        self.assertContains(response, "a")
-        self.assertNotContains(response, "b")
+        self.assertContains(response, f"/notifications/{self.n1.pk}/read/")
+        self.assertNotContains(response, f"/notifications/{self.n_other.pk}/read/")
 
     def test_mark_read_via_view(self):
         self.client.login(username="inboxuser1", password="x")
@@ -232,3 +232,27 @@ class InboxViewTests(TestCase):
         self.client.post(reverse("notifications:mark_all_read"))
         self.assertEqual(unread_count(self.user), 0)
         self.assertEqual(unread_count(self.other), 1)  # untouched
+
+
+class DeliverTaskTests(TestCase):
+    def test_missing_notification_is_ignored(self):
+        from apps.notifications.tasks import deliver_notification
+        self.assertIsNone(deliver_notification.apply(args=[999999]).get())
+
+    def test_non_in_app_channel_does_not_raise(self):
+        from apps.notifications.tasks import deliver_notification
+        user = User.objects.create_user(username="chanuser", password="x", role=User.Role.BIDDER)
+        n = Notification.objects.create(recipient=user, event=Notification.Event.OUTBID, channel=Notification.Channel.EMAIL, title="t", message="m")
+        self.assertIsNone(deliver_notification.apply(args=[n.pk]).get())
+
+    def test_navbar_badge_counts_only_unread_own(self):
+        user = User.objects.create_user(username="badgeuser", password="x", role=User.Role.BIDDER)
+        other = User.objects.create_user(username="badgeother", password="x", role=User.Role.BIDDER)
+        notify(recipient=user, event=Notification.Event.OUTBID, title="a", message="a")
+        n2 = notify(recipient=user, event=Notification.Event.OUTBID, title="b", message="b")
+        notify(recipient=other, event=Notification.Event.OUTBID, title="c", message="c")
+        from apps.notifications.services import mark_read, unread_count
+        mark_read(n2, user=user)
+        self.assertEqual(unread_count(user), 1)
+        self.client.force_login(user)
+        self.assertContains(self.client.get(reverse("core:dashboard")), 'rounded-pill">1<')

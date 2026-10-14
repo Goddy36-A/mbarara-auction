@@ -42,10 +42,10 @@ class MyBidsView(BidderRequiredMixin, View):
     full personal bid history."""
 
     def get(self, request):
+        profile = getattr(request.user, "bidder_profile", None)
         my_bids = (
-            Bid.objects.filter(bidder=request.user.bidder_profile)
-            .select_related("auction")
-            .order_by("-created_at")
+            Bid.objects.filter(bidder=profile).select_related("auction").order_by("-created_at")
+            if profile else Bid.objects.none()
         )
         won = Auction.objects.filter(winner=request.user)
         return render(request, "bidding/my_bids.html", {"my_bids": my_bids, "won_auctions": won})

@@ -31,8 +31,26 @@ class BidRejected(Exception):
     plainly what the minimum permitted bid is)."""
 
 
+MAX_BID_AMOUNT = Decimal("1000000000000")  # Bid.amount is DecimalField(max_digits=14, decimal_places=2)
+
+
+def _validate_amount(amount):
+    """Reject values that would crash a comparison or the database: NaN,
+    Infinity, more than 2 decimal places, or too many digits."""
+    if isinstance(amount, int) and not isinstance(amount, bool):
+        amount = Decimal(amount)
+    if not isinstance(amount, Decimal) or not amount.is_finite():
+        raise BidRejected("Enter a valid bid amount.")
+    if amount.as_tuple().exponent < -2:
+        raise BidRejected("Bid amounts can have at most 2 decimal places.")
+    if amount >= MAX_BID_AMOUNT:
+        raise BidRejected("That bid amount is too large.")
+    return amount
+
+
 @transaction.atomic
 def place_bid(auction: Auction, *, bidder_user, amount: Decimal) -> Bid:
+    amount = _validate_amount(amount)
     # Lock the auction row first — every other check reads from this locked
     # copy, not the possibly-stale `auction` argument the caller passed in.
     locked = Auction.objects.select_for_update().get(pk=auction.pk)

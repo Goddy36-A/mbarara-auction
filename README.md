@@ -53,7 +53,10 @@ plumbing), Payments (status tracking only — no real gateway), Disputes, and Re
   - [x] Staff-only dashboard at `/reports/`: auctions by status, sell-through, sales value, bids, payments collected/outstanding, per-category figures, verification and dispute counts, with a date-range filter
   - [x] CSV exports (`/reports/auctions.csv`, `/reports/payments.csv`) with spreadsheet-formula neutralisation
 - [ ] Security hardening — **Phase 11**
-- [ ] Test suite — **Phase 12**
+- [x] Test suite — **Phase 12**: 225 tests, ~94% line coverage of `apps/`
+  - [x] Unit/service tests per app, plus view, form, management-command and notification-task tests
+  - [x] `apps/core/test_security.py`: access-control matrix for every URL by role (anonymous / bidder / seller / officer), CSRF, GET-on-POST-only, object-level isolation, privacy of bidder identities; fails if a new URL is added without an access decision
+  - [x] Shared factories in `apps/core/testing.py`
 - [ ] Deployment hardening — **Phase 13**
 
 ---
@@ -125,6 +128,9 @@ Visit http://localhost:8000
 
 ```bash
 DJANGO_SETTINGS_MODULE=config.settings.testing python manage.py test
+# with coverage:
+pip install coverage
+coverage run --source=apps manage.py test && coverage report --skip-empty
 ```
 
 ---
