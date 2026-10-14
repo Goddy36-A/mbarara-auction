@@ -53,7 +53,12 @@ plumbing), Payments (status tracking only — no real gateway), Disputes, and Re
   - [x] Staff-only dashboard at `/reports/`: auctions by status, sell-through, sales value, bids, payments collected/outstanding, per-category figures, verification and dispute counts, with a date-range filter
   - [x] CSV exports (`/reports/auctions.csv`, `/reports/payments.csv`) with spreadsheet-formula neutralisation
 - [ ] Security hardening — **Phase 11**
-- [x] Test suite — **Phase 12**: 225 tests, ~94% line coverage of `apps/`
+- [x] Auction Control dashboard (staff) at `/control/`
+  - [x] Per-auction screen to **start now**, **reschedule** (scheduled: start + end; live: extend only; paused: end), **pause / resume**, **cancel** and **end now**, each audit-logged, reason-required where it matters, with seller and bidders notified (`apps/auctions/scheduling.py`)
+  - [x] **Run sweep now** button: same rules as the `activate_scheduled_auctions` / `close_ended_auctions` commands, for when cron is not running; the dashboard warns when auctions are overdue
+  - [x] Live **countdowns** for scheduled (time to open) and live (time to close) auctions on home, browse, detail and control pages; seconds come from the server, `static/js/countdown.js` only ticks them down
+  - [x] Dark "terminal" theme (`static/css/site.css`)
+- [x] Test suite — **Phase 12**: 264 tests, ~94% line coverage of `apps/`
   - [x] Unit/service tests per app, plus view, form, management-command and notification-task tests
   - [x] `apps/core/test_security.py`: access-control matrix for every URL by role (anonymous / bidder / seller / officer), CSRF, GET-on-POST-only, object-level isolation, privacy of bidder identities; fails if a new URL is added without an access decision
   - [x] Shared factories in `apps/core/testing.py`

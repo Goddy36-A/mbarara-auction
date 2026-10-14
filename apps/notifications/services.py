@@ -263,3 +263,17 @@ def notify_dispute_resolved(dispute, recipient):
         obj=dispute,
         link=f"/disputes/{dispute.pk}/",
     )
+
+
+def notify_auction_update(auction, event, title, message, *, include_bidders=True):
+    """Tell the seller (and, by default, everyone with an accepted bid) that
+    staff changed something about an auction: rescheduled, paused, resumed
+    or cancelled."""
+    recipients = {auction.seller.user_id: auction.seller.user}
+    if include_bidders:
+        for bid in auction.bids.filter(status="ACCEPTED").select_related("bidder__user"):
+            recipients[bid.bidder.user_id] = bid.bidder.user
+    return [
+        notify(recipient=user, event=event, title=title, message=message, obj=auction, link=f"/auctions/{auction.pk}/")
+        for user in recipients.values()
+    ]

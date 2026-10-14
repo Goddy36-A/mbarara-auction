@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Auction control{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-2 mb-4">
+    <div>
+        <div class="eyebrow">&gt; control_room</div>
+        <h2 class="mb-0">Auction control</h2>
+    </div>
+    <form method="post" action="{% url 'control:sweep' %}">
+        {% csrf_token %}
+        <button class="btn btn-outline-primary btn-sm" type="submit" title="Start every auction whose start time has passed and close every one whose end time has passed">Run sweep now</button>
+    </form>
+</div>
+
+{% if overdue_start or overdue_close %}
+<div class="alert alert-warning">
+    {% if overdue_start %}<strong>{{ overdue_start }}</strong> scheduled auction(s) are past their start time but not live yet. {% endif %}
+    {% if overdue_close %}<strong>{{ overdue_close }}</strong> live auction(s) are past their end time but not closed yet. {% endif %}
+    The scheduled commands may not be running. Click <em>Run sweep now</em> to process them.
+</div>
+{% endif %}
+
+<div class="row g-3 mb-5">
+    <div class="col-6 col-md-3"><div class="tile"><div class="k">Scheduled</div><div class="v">{{ scheduled|length }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="tile"><div class="k">Live</div><div class="v">{{ live|length }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="tile {% if ending_soon %}warn{% endif %}"><div class="k">Ending within 1h</div><div class="v">{{ ending_soon }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="tile"><div class="k">Bids on live</div><div class="v">{{ total_bids }}</div></div></div>
+</div>
+
+<div class="section-title mb-3">Scheduled</div>
+<div class="table-responsive mb-5">
+<table class="table align-middle">
+    <thead><tr><th>#</th><th>Auction</th><th>Seller</th><th>Starts</th><th>Countdown</th><th></th></tr></thead>
+    <tbody>
+    {% for a in scheduled %}
+        <tr>
+            <td class="mono">{{ a.pk }}</td>
+            <td>{{ a.title }}<div class="small text-muted">{{ a.category.name }} &middot; start {{ a.starting_price }}</div></td>
+            <td>{{ a.seller.user.username }}</td>
+            <td class="mono small">{{ a.start_time }}</td>
+            <td>{% include "includes/countdown.html" with seconds=a.seconds_until_start label="Opens in" done="OVERDUE" extra_class="sm" %}</td>
+            <td class="text-end text-nowrap">
+                <form method="post" action="{% url 'control:start' a.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-primary btn-sm" type="submit">Start now</button></form>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'control:auction' a.pk %}">Manage</a>
+            </td>
+        </tr>
+    {% empty %}<tr><td colspan="6" class="text-muted">Nothing scheduled.</td></tr>{% endfor %}
+    </tbody>
+</table>
+</div>
+
+<div class="section-title mb-3">Live</div>
+<div class="table-responsive mb-5">
+<table class="table align-middle">
+    <thead><tr><th>#</th><th>Auction</th><th>Current bid</th><th>Bids</th><th>Countdown</th><th></th></tr></thead>
+    <tbody>
+    {% for a in live %}
+        <tr>
+            <td class="mono">{{ a.pk }}</td>
+            <td>{{ a.title }}<div class="small text-muted">{{ a.seller.user.username }}</div></td>
+            <td class="price">{{ a.display_price }}</td>
+            <td class="mono">{{ a.bid_total }}</td>
+            <td>{% include "includes/countdown.html" with seconds=a.seconds_until_end label="Closes in" done="OVERDUE" extra_class="sm" %}</td>
+            <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="{% url 'control:auction' a.pk %}">Manage</a></td>
+        </tr>
+    {% empty %}<tr><td colspan="6" class="text-muted">No live auctions.</td></tr>{% endfor %}
+    </tbody>
+</table>
+</div>
+
+{% if paused %}
+<div class="section-title mb-3">Paused</div>
+<div class="table-responsive mb-4">
+<table class="table align-middle">
+    <thead><tr><th>#</th><th>Auction</th><th>Bids</th><th>Ends</th><th></th></tr></thead>
+    <tbody>
+    {% for a in paused %}
+        <tr><td class="mono">{{ a.pk }}</td><td>{{ a.title }}</td><td class="mono">{{ a.bid_total }}</td><td class="mono small">{{ a.end_time }}</td>
+        <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="{% url 'control:auction' a.pk %}">Manage</a></td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

@@ -60,3 +60,12 @@ can't call the GitHub API directly to push commits from here. Two options:
   - Officers/admins opening `/bids/mine/`, `/payments/received/` or `/listings/mine/` got a 500 (no bidder/seller profile). They now see empty lists, and cannot open the create-listing form (403).
   - `test_inbox_only_shows_own_notifications` asserted the page never contains the letter "b"; it now checks for the other user's notification link.
 - `requirements.txt` could not be installed as pinned (`crispy-bootstrap5==2026.9` needs `django-crispy-forms>=2.3` and `Django>=5.2`, while `django-celery-beat==2.6.0` caps Django below 5.2). Loosened to `django-crispy-forms>=2.6,<3` and `django-celery-beat>=2.8,<3`; `pip install -r requirements.txt` now resolves.
+
+## Update: Auction Control dashboard, countdowns, new theme
+
+- New migrations: `audit/0002` and `notifications/0003` (new action and event choices). Run `python manage.py migrate`.
+- Automatic starting/closing is unchanged and still needs the two commands on a schedule. Public page loads deliberately do NOT start or close auctions (the project rule is that the server, not a visitor's browser, decides timing). Staff can start/close on demand from `/control/`.
+- Countdowns are cosmetic. Bidding open/closed is always decided server-side at the moment a bid is placed.
+- When a countdown reaches zero the page re-checks with the server after 3 seconds (20 seconds if it was already at zero on load, to avoid reload loops while waiting for the next sweep).
+- The pause/resume feature does not freeze the clock: if the end time passes while paused, staff must set a new end time before resuming.
+- Tested: 264 Python tests and a jsdom run of `countdown.js`. The visual theme has not been checked in a real browser from this environment, so give the pages a quick look on a phone and a laptop.

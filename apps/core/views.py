@@ -5,7 +5,11 @@ from django.shortcuts import render
 def home(request):
     """Public landing page — approved/live auctions will be listed here
     once the auctions app's browse view exists (Phase 5)."""
-    return render(request, "core/home.html")
+    from apps.auctions.models import Auction
+
+    live = Auction.objects.filter(status=Auction.Status.LIVE).select_related("category").order_by("end_time")[:3]
+    upcoming = Auction.objects.filter(status=Auction.Status.SCHEDULED).select_related("category").order_by("start_time")[:3]
+    return render(request, "core/home.html", {"live": live, "upcoming": upcoming})
 
 
 @login_required

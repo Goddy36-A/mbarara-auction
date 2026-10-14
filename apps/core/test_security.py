@@ -61,6 +61,7 @@ class AccessMatrixTests(TestCase):
             "accounts:verification_queue": {ANON: 0, BIDDER: 0, SELLER: 0, OFFICER: 1},
             "disputes:queue": {ANON: 0, BIDDER: 0, SELLER: 0, OFFICER: 1},
             "disputes:mine": {ANON: 0, BIDDER: 1, SELLER: 1, OFFICER: 1},
+            "control:dashboard": {ANON: 0, BIDDER: 0, SELLER: 0, OFFICER: 1},
             "reports:dashboard": {ANON: 0, BIDDER: 0, SELLER: 0, OFFICER: 1},
             "reports:auctions_csv": {ANON: 0, BIDDER: 0, SELLER: 0, OFFICER: 1},
             "reports:payments_csv": {ANON: 0, BIDDER: 0, SELLER: 0, OFFICER: 1},
@@ -94,6 +95,10 @@ class AccessMatrixTests(TestCase):
             ("listings:reject", OFFICER, [self.submitted.pk]), ("bidding:place_bid", BIDDER, [self.auction.pk]),
             ("notifications:mark_all_read", BIDDER, []), ("payments:mark_paid", OFFICER, [1]),
             ("payments:mark_failed", OFFICER, [1]), ("disputes:resolve", OFFICER, [1]), ("disputes:take", OFFICER, [1]),
+            ("control:start", OFFICER, [self.auction.pk]), ("control:reschedule", OFFICER, [self.auction.pk]),
+            ("control:pause", OFFICER, [self.auction.pk]), ("control:resume", OFFICER, [self.auction.pk]),
+            ("control:cancel", OFFICER, [self.auction.pk]), ("control:end", OFFICER, [self.auction.pk]),
+            ("control:sweep", OFFICER, []),
         ]:
             with self.subTest(url=name):
                 self.assertEqual(self.login(who).get(reverse(name, args=args)).status_code, 405)
@@ -155,6 +160,8 @@ class AccessMatrixTests(TestCase):
             "accounts:verification_queue", "accounts:verify_seller", "accounts:verify_bidder", "disputes:mine",
             "disputes:queue", "disputes:create", "disputes:detail", "disputes:take", "disputes:resolve",
             "reports:dashboard", "reports:auctions_csv", "reports:payments_csv",
+            "control:dashboard", "control:auction", "control:sweep", "control:start", "control:reschedule",
+            "control:pause", "control:resume", "control:cancel", "control:end",
         }
         resolver = get_resolver()
         actual = set()
@@ -182,3 +189,23 @@ class OfficerWithoutProfileTests(TestCase):
         c.force_login(make_user(User.Role.OFFICER))
         self.assertEqual(c.get(reverse("listings:create")).status_code, 403)
         self.assertEqual(c.post(reverse("listings:create"), {"title": "x"}).status_code, 403)
+
+
+class ControlAccessTests(TestCase):
+    """Every control action is staff-only, including POSTs, and changes nothing for others."""
+
+    def test_non_staff_cannot_run_any_control_action(self):
+        seller = make_user(User.Role.SELLER)
+        bidder = make_user(User.Role.BIDDER)
+        auction = make_auction(seller, to=Status.SCHEDULED)
+        for user in (None, seller, bidder):
+            c = Client()
+            if user:
+                c.force_login(user)
+            for name in ("start", "reschedule", "pause", "resume", "cancel", "end"):
+                resp = c.post(reverse(f"control:{name}", args=[auction.pk]), {"reason": "x"})
+                self.assertEqual(resp.status_code, 403, f"{user} {name}")
+            self.assertEqual(c.post(reverse("control:sweep")).status_code, 403)
+            self.assertEqual(c.get(reverse("control:auction", args=[auction.pk])).status_code, 403)
+        auction.refresh_from_db()
+        self.assertEqual(auction.status, Status.SCHEDULED)

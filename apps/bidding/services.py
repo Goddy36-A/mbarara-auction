@@ -132,7 +132,7 @@ def invalidate_bid(bid: Bid, *, actor, reason: str):
 
 
 @transaction.atomic
-def close_auction(auction: Auction, *, actor=None):
+def close_auction(auction: Auction, *, actor=None, reason="Automated closing at end_time"):
     """
     Automated closing (Section 25). Intended to be called by a scheduled
     task (see apps/bidding/management/commands/close_ended_auctions.py),
@@ -165,7 +165,7 @@ def close_auction(auction: Auction, *, actor=None):
     locked.reserve_met = reserve_met
     locked.save(update_fields=["winner", "final_price", "reserve_met", "updated_at"])
 
-    locked = transition(locked, AuctionStatus.CLOSED, actor=actor, reason="Automated closing at end_time")
+    locked = transition(locked, AuctionStatus.CLOSED, actor=actor, reason=reason)
 
     if winner_user:
         AuditLog.record(

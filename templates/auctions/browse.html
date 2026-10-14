@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Browse auctions{% endblock %}
 {% block content %}
-<h2>Browse auctions</h2>
+<h2 class="mb-3">Browse auctions</h2>
 <form method="get" class="row g-2 mb-4">
     <div class="col-md-5">
         <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search title or description">
@@ -20,13 +20,19 @@
 <div class="row row-cols-1 row-cols-md-3 g-4">
     {% for auction in auctions %}
     <div class="col">
-        <div class="card h-100">
-            <div class="card-body">
-                <span class="badge bg-{% if auction.status == 'LIVE' %}success{% else %}secondary{% endif %} mb-2">{{ auction.get_status_display }}</span>
-                <h5 class="card-title">{{ auction.title }}</h5>
-                <p class="card-text text-muted">{{ auction.category.name }} &middot; {{ auction.location }}</p>
-                <p class="card-text">Current: <strong>{{ auction.display_price }}</strong></p>
-                <a href="{% url 'auctions:detail' auction.pk %}" class="btn btn-outline-primary btn-sm">View</a>
+        <div class="card h-100 hover">
+            <div class="card-body d-flex flex-column">
+                <span class="status-chip status-{{ auction.status }} mb-2 align-self-start">{{ auction.get_status_display }}</span>
+                <h5 class="card-title mt-2">{{ auction.title }}</h5>
+                <p class="card-text text-muted small">{{ auction.category.name }} &middot; {{ auction.location }}</p>
+                <div class="mb-3"><span class="text-muted small">{% if auction.status == "SCHEDULED" %}Starting price{% else %}Current{% endif %}</span><br>
+                    <span class="price fs-5">{% if auction.status == "SCHEDULED" %}{{ auction.starting_price }}{% else %}{{ auction.display_price }}{% endif %}</span></div>
+                {% if auction.status == "SCHEDULED" %}
+                    {% include "includes/countdown.html" with seconds=auction.seconds_until_start label="Opens in" done="STARTING…" reload=1 extra_class="sm mb-3" %}
+                {% elif auction.status == "LIVE" %}
+                    {% include "includes/countdown.html" with seconds=auction.seconds_until_end label="Closes in" done="CLOSING…" reload=1 extra_class="sm mb-3" %}
+                {% endif %}
+                <a href="{% url 'auctions:detail' auction.pk %}" class="btn btn-outline-primary btn-sm mt-auto align-self-start">View</a>
             </div>
         </div>
     </div>

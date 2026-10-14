@@ -1,15 +1,42 @@
 {% extends "base.html" %}
 {% block title %}Home — Mbarara Online Auction{% endblock %}
 {% block content %}
-<div class="p-5 mb-4 bg-light rounded-3">
-    <h1 class="display-6">Transparent bidding. Fair price discovery.</h1>
-    <p class="col-md-8 fs-5">
-        Browse live auctions from verified sellers in Mbarara City. Every bid is timestamped
-        and recorded — the winning price is decided by open competition, not negotiation.
+<div class="hero mb-5">
+    <div class="eyebrow mb-2">&gt; open_bidding.exe</div>
+    <h1 class="display-5">Transparent bidding.<br><span class="accent">Fair price discovery.</span></h1>
+    <p class="col-md-8 fs-5 text-muted mt-3">
+        Live auctions from verified sellers in Mbarara City. Every bid is timestamped and
+        recorded on the server: the winning price is decided by open competition, not negotiation.
     </p>
-    {% if not user.is_authenticated %}
-        <a class="btn btn-primary btn-lg" href="{% url 'accounts:register' %}">Get started</a>
-    {% endif %}
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-primary btn-lg" href="{% url 'auctions:browse' %}">Browse auctions</a>
+        {% if not user.is_authenticated %}<a class="btn btn-outline-primary btn-lg" href="{% url 'accounts:register' %}">Get started</a>{% endif %}
+    </div>
 </div>
-<p class="text-muted">Live auction listings appear here once the auctions app is built out (Phase 5).</p>
+
+<div class="section-title mb-3">Live now</div>
+<div class="row row-cols-1 row-cols-md-3 g-3 mb-5">
+    {% for a in live %}
+    <div class="col"><a href="{% url 'auctions:detail' a.pk %}" class="text-decoration-none"><div class="card h-100"><div class="card-body">
+        <span class="status-chip status-LIVE mb-2">Live</span>
+        <h5 class="mt-2 text-light">{{ a.title }}</h5>
+        <div class="text-muted small mb-2">{{ a.category.name }}</div>
+        <div class="price mb-3">{{ a.display_price }}</div>
+        {% include "includes/countdown.html" with seconds=a.seconds_until_end label="Closes in" done="CLOSING…" reload=1 extra_class="sm" %}
+    </div></div></a></div>
+    {% empty %}<p class="text-muted">No auctions are live right now.</p>{% endfor %}
+</div>
+
+<div class="section-title mb-3">Opening soon</div>
+<div class="row row-cols-1 row-cols-md-3 g-3">
+    {% for a in upcoming %}
+    <div class="col"><a href="{% url 'auctions:detail' a.pk %}" class="text-decoration-none"><div class="card h-100"><div class="card-body">
+        <span class="status-chip status-SCHEDULED mb-2">Scheduled</span>
+        <h5 class="mt-2 text-light">{{ a.title }}</h5>
+        <div class="text-muted small mb-2">{{ a.category.name }}</div>
+        <div class="mono text-muted mb-3">Starts at <span class="price">{{ a.starting_price }}</span></div>
+        {% include "includes/countdown.html" with seconds=a.seconds_until_start label="Opens in" done="STARTING…" reload=1 extra_class="sm" %}
+    </div></div></a></div>
+    {% empty %}<p class="text-muted">Nothing scheduled yet.</p>{% endfor %}
+</div>
 {% endblock %}

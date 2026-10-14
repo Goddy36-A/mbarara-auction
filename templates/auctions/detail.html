@@ -40,11 +40,26 @@
     <div class="col-md-5">
         <div class="card">
             <div class="card-body">
-                <p>Starting price: {{ auction.starting_price }}</p>
-                <p>Current bid: <strong>{{ auction.display_price }}</strong></p>
-                <p>Minimum increment: {{ auction.min_increment }}</p>
-                <p>Status: <span class="badge bg-secondary">{{ auction.get_status_display }}</span></p>
-                <p>Closes: {{ auction.end_time }}</p>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="status-chip status-{{ auction.status }}">{{ auction.get_status_display }}</span>
+                    <span class="text-muted small mono">#{{ auction.pk }}</span>
+                </div>
+
+                {% if auction.status == "SCHEDULED" %}
+                    {% include "includes/countdown.html" with seconds=auction.seconds_until_start label="Bidding opens in" done="STARTING…" reload=1 extra_class="w-100 mb-3" %}
+                    <p class="text-muted small mono mb-3">Opens {{ auction.start_time }}<br>Closes {{ auction.end_time }}</p>
+                {% elif auction.status == "LIVE" %}
+                    {% include "includes/countdown.html" with seconds=auction.seconds_until_end label="Bidding closes in" done="CLOSING…" reload=1 extra_class="w-100 mb-3" %}
+                    <p class="text-muted small mono mb-3">Closes {{ auction.end_time }}</p>
+                {% elif auction.status == "PAUSED" %}
+                    <p class="mono" style="color: var(--amber)">Bidding is paused by staff.</p>
+                {% else %}
+                    <p class="text-muted small mono mb-3">Closed {{ auction.end_time }}</p>
+                {% endif %}
+
+                <div class="text-muted small">{% if auction.current_highest_bid %}Current bid{% else %}Starting price{% endif %}</div>
+                <div class="price price-lg mb-2">{{ auction.display_price }}</div>
+                <p class="mono small text-muted">Start {{ auction.starting_price }} &middot; Min. increment {{ auction.min_increment }}</p>
 
                 {% if can_bid %}
                     <form method="post" action="{% url 'bidding:place_bid' auction.pk %}">
@@ -67,6 +82,8 @@
                             Your bidder account must be verified and active to bid.
                         {% endif %}
                     </p>
+                {% elif auction.status == "SCHEDULED" %}
+                    <p class="text-muted small">You can place bids once the countdown reaches zero and the auction goes live.</p>
                 {% else %}
                     <p class="text-muted">Bidding is not currently open on this auction.</p>
                 {% endif %}

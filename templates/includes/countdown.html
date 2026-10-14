@@ -1,0 +1,5 @@
+{# Usage: {% include "includes/countdown.html" with seconds=auction.seconds_until_start label="Opens in" done="STARTING…" reload=1 %} #}
+<div class="countdown {{ extra_class }}" data-countdown data-seconds="{{ seconds }}" data-done-text="{{ done|default:'00:00:00' }}" data-reload="{{ reload|default:0 }}">
+    <span class="cd-label">{{ label }}</span>
+    <span class="cd-value">--:--:--</span>
+</div>

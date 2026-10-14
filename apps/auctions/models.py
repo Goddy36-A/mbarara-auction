@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 
 from apps.core.models import TimeStampedModel
@@ -101,6 +102,16 @@ class Auction(TimeStampedModel):
     @property
     def display_price(self):
         return self.current_highest_bid or self.starting_price
+
+    @property
+    def seconds_until_start(self):
+        """Whole seconds until start_time (0 once it has passed). Computed on
+        the server so the page countdown never depends on the visitor's clock."""
+        return max(0, int((self.start_time - timezone.now()).total_seconds()))
+
+    @property
+    def seconds_until_end(self):
+        return max(0, int((self.end_time - timezone.now()).total_seconds()))
 
     @property
     def is_biddable(self):

@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,9 +9,9 @@
     <link rel="stylesheet" href="{% static 'css/site.css' %}">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'core:home' %}">Mbarara Auctions</a>
+            <a class="navbar-brand" href="{% url 'core:home' %}">MBARARA<span class="slash">//</span>AUCTIONS<span class="caret"></span></a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -27,10 +27,11 @@
                         <li class="nav-item"><a class="nav-link" href="{% url 'payments:my_payments' %}">My Payments</a></li>
                     {% endif %}
                     {% if user.is_authenticated and user.is_officer_or_admin %}
-                        <li class="nav-item"><a class="nav-link" href="{% url 'listings:approval_queue' %}">Approval Queue</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'payments:queue' %}">Payment Queue</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'disputes:queue' %}">Disputes</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'reports:dashboard' %}">Reports</a></li>
+                        <li class="nav-item"><a class="nav-link staff" href="{% url 'control:dashboard' %}">Control</a></li>
+                        <li class="nav-item"><a class="nav-link staff" href="{% url 'listings:approval_queue' %}">Approval Queue</a></li>
+                        <li class="nav-item"><a class="nav-link staff" href="{% url 'payments:queue' %}">Payment Queue</a></li>
+                        <li class="nav-item"><a class="nav-link staff" href="{% url 'disputes:queue' %}">Disputes</a></li>
+                        <li class="nav-item"><a class="nav-link staff" href="{% url 'reports:dashboard' %}">Reports</a></li>
                     {% endif %}
                     {% if user.is_authenticated and not user.is_officer_or_admin %}
                         <li class="nav-item"><a class="nav-link" href="{% url 'disputes:mine' %}">My Disputes</a></li>
@@ -72,9 +73,10 @@
     </main>
 
     <footer class="text-center text-muted py-4 border-top">
-        <small>&copy; {% now "Y" %} Mbarara Online Auction System</small>
+        <small>&copy; {% now "Y" %} MBARARA//AUCTIONS &middot; server time is the only clock that counts</small>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/countdown.js' %}"></script>
 </body>
 </html>

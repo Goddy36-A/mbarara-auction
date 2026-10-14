@@ -30,6 +30,10 @@ class Notification(models.Model):
         ACCOUNT_REACTIVATED = "ACCOUNT_REACTIVATED", "Account reactivated"
         PAYMENT_RECEIVED = "PAYMENT_RECEIVED", "Payment received"
         PAYMENT_FAILED = "PAYMENT_FAILED", "Payment marked failed"
+        AUCTION_RESCHEDULED = "AUCTION_RESCHEDULED", "Auction rescheduled"
+        AUCTION_PAUSED = "AUCTION_PAUSED", "Auction paused"
+        AUCTION_RESUMED = "AUCTION_RESUMED", "Auction resumed"
+        AUCTION_CANCELLED = "AUCTION_CANCELLED", "Auction cancelled"
         DISPUTE_OPENED = "DISPUTE_OPENED", "Dispute raised"
         DISPUTE_RESOLVED = "DISPUTE_RESOLVED", "Dispute resolved"
 

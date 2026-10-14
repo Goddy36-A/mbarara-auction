@@ -11,6 +11,7 @@ urlpatterns = [
     path("", include("apps.core.urls", namespace="core")),
     path("accounts/", include("apps.accounts.urls", namespace="accounts")),
     path("auctions/", include("apps.auctions.urls", namespace="auctions")),
+    path("control/", include("apps.auctions.control_urls", namespace="control")),
     path("listings/", include("apps.listings.urls", namespace="listings")),
     path("bids/", include("apps.bidding.urls", namespace="bidding")),
     path("notifications/", include("apps.notifications.urls", namespace="notifications")),

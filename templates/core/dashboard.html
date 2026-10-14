@@ -25,6 +25,7 @@
 {% elif user.is_officer_or_admin %}
     <p>Administrator tools:</p>
     <ul>
+        <li><a href="{% url 'control:dashboard' %}">Auction control: start, reschedule, pause or end auctions</a></li>
         <li><a href="{% url 'accounts:verification_queue' %}">Seller & bidder verification queue</a></li>
         <li><a href="{% url 'listings:approval_queue' %}">Auction listing approval queue</a></li>
         <li><a href="{% url 'disputes:queue' %}">Open disputes</a></li>

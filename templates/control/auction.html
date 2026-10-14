@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Control: {{ auction.title }}{% endblock %}
+{% block content %}
+<a href="{% url 'control:dashboard' %}" class="small">&larr; Auction control</a>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 my-3">
+    <div>
+        <div class="eyebrow">&gt; auction #{{ auction.pk }}</div>
+        <h2 class="mb-1">{{ auction.title }}</h2>
+        <span class="status-chip status-{{ auction.status }}">{{ auction.get_status_display }}</span>
+        <a class="small ms-2" href="{% url 'auctions:detail' auction.pk %}">public page</a>
+    </div>
+    {% if auction.status == "SCHEDULED" %}
+        {% include "includes/countdown.html" with seconds=auction.seconds_until_start label="Opens in" done="OVERDUE" %}
+    {% elif auction.status == "LIVE" %}
+        {% include "includes/countdown.html" with seconds=auction.seconds_until_end label="Closes in" done="OVERDUE" %}
+    {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3"><div class="tile"><div class="k">Seller</div><div class="mono">{{ auction.seller.user.username }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="tile"><div class="k">Current / start</div><div class="price">{{ auction.display_price }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="tile"><div class="k">Accepted bids</div><div class="v">{{ auction.bid_total }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="tile"><div class="k">Extension</div><div class="mono">{{ auction.extension_minutes }} min</div></div></div>
+</div>
+<p class="mono small text-muted">Starts {{ auction.start_time }} &middot; Ends {{ auction.end_time }}</p>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="section-title mb-3">Actions</div>
+        {% if can_start %}
+        <div class="card mb-3"><div class="card-body">
+            <h6>Start now</h6>
+            <p class="text-muted small mb-2">Opens bidding immediately instead of waiting for the start time.</p>
+            <form method="post" action="{% url 'control:start' auction.pk %}">{% csrf_token %}<button class="btn btn-primary btn-sm" type="submit">Start now</button></form>
+        </div></div>
+        {% endif %}
+
+        {% if can_reschedule %}
+        <div class="card mb-3"><div class="card-body">
+            <h6>Reschedule</h6>
+            <p class="text-muted small">
+                {% if can_edit_start %}Change the start and/or end time.{% elif auction.status == "LIVE" %}A live auction can only be extended (new end time must be later).{% else %}Set a new end time.{% endif %}
+                Everyone involved is notified.
+            </p>
+            <form method="post" action="{% url 'control:reschedule' auction.pk %}">
+                {% csrf_token %}
+                {% if can_edit_start %}
+                <div class="mb-2"><label class="form-label">New start</label><input type="datetime-local" name="start_time" value="{{ local_start }}" class="form-control"></div>
+                {% endif %}
+                <div class="mb-2"><label class="form-label">New end</label><input type="datetime-local" name="end_time" value="{{ local_end }}" class="form-control"></div>
+                <div class="mb-2"><label class="form-label">Reason (required)</label><input type="text" name="reason" maxlength="500" class="form-control" required></div>
+                <button class="btn btn-outline-primary btn-sm" type="submit">Save schedule</button>
+            </form>
+        </div></div>
+        {% endif %}
+
+        {% if can_pause %}
+        <div class="card mb-3"><div class="card-body">
+            <h6>Pause bidding</h6>
+            <form method="post" action="{% url 'control:pause' auction.pk %}" class="d-flex gap-2">
+                {% csrf_token %}
+                <input type="text" name="reason" class="form-control" placeholder="Reason (required)" required>
+                <button class="btn btn-warning btn-sm" type="submit">Pause</button>
+            </form>
+        </div></div>
+        {% endif %}
+
+        {% if can_resume %}
+        <div class="card mb-3"><div class="card-body">
+            <h6>Resume bidding</h6>
+            <p class="text-muted small mb-2">If the end time has passed, set a new one under Reschedule first.</p>
+            <form method="post" action="{% url 'control:resume' auction.pk %}">{% csrf_token %}<button class="btn btn-primary btn-sm" type="submit">Resume</button></form>
+        </div></div>
+        {% endif %}
+
+        {% if can_end %}
+        <div class="card mb-3"><div class="card-body">
+            <h6>End now</h6>
+            <p class="text-muted small">Closes the auction immediately and picks the winner by the normal rules (reserve price applies).</p>
+            <form method="post" action="{% url 'control:end' auction.pk %}" class="d-flex gap-2">
+                {% csrf_token %}
+                <input type="text" name="reason" class="form-control" placeholder="Reason (required)" required>
+                <button class="btn btn-outline-danger btn-sm" type="submit">End now</button>
+            </form>
+        </div></div>
+        {% endif %}
+
+        {% if can_cancel %}
+        <div class="card mb-3"><div class="card-body">
+            <h6>Cancel auction</h6>
+            <p class="text-muted small">Final. No winner is declared. Bids already placed stay on record.</p>
+            <form method="post" action="{% url 'control:cancel' auction.pk %}" class="d-flex gap-2">
+                {% csrf_token %}
+                <input type="text" name="reason" class="form-control" placeholder="Reason (required)" required>
+                <button class="btn btn-danger btn-sm" type="submit">Cancel</button>
+            </form>
+        </div></div>
+        {% endif %}
+
+        {% if not can_start and not can_reschedule and not can_pause and not can_resume and not can_end and not can_cancel %}
+            <p class="text-muted">No scheduling actions are available for a {{ auction.get_status_display|lower }} auction.</p>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-6">
+        <div class="section-title mb-3">History</div>
+        <table class="table table-sm">
+            <thead><tr><th>When</th><th>Change</th><th>By</th></tr></thead>
+            <tbody>
+            {% for h in history %}
+                <tr><td class="mono small">{{ h.changed_at|date:"d M H:i" }}</td>
+                    <td>{{ h.from_status }} &rarr; {{ h.to_status }}{% if h.reason %}<div class="small text-muted">{{ h.reason }}</div>{% endif %}</td>
+                    <td class="small">{{ h.changed_by.username|default:"system" }}</td></tr>
+            {% empty %}<tr><td colspan="3" class="text-muted">No changes yet.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
